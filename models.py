@@ -1772,6 +1772,10 @@ class StudentProfile(db.Model):
 
     academic_status = db.Column(db.String(50), default='Active')  # Active, Probation, Graduated, Suspended
 
+    vetting_status = db.Column(db.String(20), default='pending', nullable=False)
+
+    rejection_reason = db.Column(db.Text, nullable=True)
+
     last_score = db.Column(db.Float, nullable=True)  # Last cumulative score
 
     admission_date = db.Column(db.Date, nullable=True)
@@ -3902,4 +3906,4 @@ class StudentPromotion(db.Model):
 
         }
 
-    
+
