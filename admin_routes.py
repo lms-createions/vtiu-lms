@@ -111,11 +111,19 @@ def ensure_release_columns():
 
         SemesterResultRelease.__table__.create(db.engine, checkfirst=True)
         expected_columns = {
+            'academic_year': 'VARCHAR(20)',
+            'semester': 'VARCHAR(10)',
+            'is_released': 'BOOLEAN DEFAULT FALSE',
+            'is_locked': 'BOOLEAN DEFAULT FALSE',
+            'released_at': 'TIMESTAMP',
+            'locked_at': 'TIMESTAMP',
             'submitted_by': 'INTEGER',
             'submitted_by_name': 'TEXT',
             'submitted_at': 'TIMESTAMP',
             'submitted_note': 'TEXT',
             'submitted_courses': 'TEXT',
+            'created_at': 'TIMESTAMP',
+            'updated_at': 'TIMESTAMP',
         }
 
         with db.engine.begin() as connection:
@@ -135,9 +143,34 @@ def ensure_release_columns():
 
 def ensure_promotion_tables():
     """Ensure promotion tables exist before promotion pages query them."""
+    from sqlalchemy import inspect, text
     from models import StudentPromotion
 
     StudentPromotion.__table__.create(db.engine, checkfirst=True)
+    expected_columns = {
+        'student_id': 'VARCHAR(50)',
+        'promoted_by': 'INTEGER',
+        'from_level': 'VARCHAR(10)',
+        'to_level': 'VARCHAR(10)',
+        'gpa': 'DOUBLE PRECISION',
+        'academic_status': 'VARCHAR(50)',
+        'academic_year': 'VARCHAR(10)',
+        'promoted_at': 'TIMESTAMP',
+        'created_at': 'TIMESTAMP',
+        'notes': 'TEXT',
+    }
+
+    with db.engine.begin() as connection:
+        columns = {
+            column['name']
+            for column in inspect(connection).get_columns('student_promotion')
+        }
+        for column_name, column_type in expected_columns.items():
+            if column_name not in columns:
+                connection.execute(text(
+                    f'ALTER TABLE student_promotion '
+                    f'ADD COLUMN {column_name} {column_type}'
+                ))
 
 
 
@@ -8786,4 +8819,3 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('select_portal'))
-
