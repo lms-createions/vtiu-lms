@@ -900,7 +900,7 @@ def get_daily_revenue(days=30):
         end_date = end_dt.date()
         start_date = end_date - timedelta(days=days - 1)
 
-        # Use SQL date() function for SQLite compatibility, fallback to cast if available
+        # Use a database-compatible date expression for the report query.
         from sqlalchemy import func
 
         # Query sums grouped by date string (YYYY-MM-DD)
@@ -1160,3 +1160,4 @@ def get_department_breakdown():
 # In your main app.py, add:
 # from finance_routes import finance_bp
 # app.register_blueprint(finance_bp, url_prefix='/admin/finance')
+
