@@ -74,9 +74,9 @@
               </div>
 
               <div class="col-md-12">
-                <label for="email" class="form-label">Login Email <span class="text-danger">*</span></label>
-                <input type="email" name="email" id="email" class="form-control form-control-sm" required>
-                <small class="form-text text-muted">Must be unique.</small>
+                <label for="email" class="form-label">Login Email</label>
+                <input type="email" name="email" id="email" class="form-control form-control-sm" readonly>
+                <small class="form-text text-muted">Generated automatically from the user name and role.</small>
               </div>
 
               <div class="col-md-12">
@@ -317,6 +317,7 @@
   // --- Dynamic role switching ---
   function updateRoleDisplay() {
     const role = document.getElementById('role').value;
+    updateGeneratedEmail();
     
     // Hide all role sections
     document.querySelectorAll('.role-section').forEach(el => el.classList.remove('active'));
@@ -349,6 +350,33 @@
       applyPreset(role);
     }
   }
+
+  function updateGeneratedEmail() {
+    const clean = value => (value || '').replace(/[^a-zA-Z]/g, '').toLowerCase();
+    const first = clean(document.getElementById('first_name').value);
+    const middle = clean(document.getElementById('middle_name').value);
+    const last = clean(document.getElementById('last_name').value);
+    const role = document.getElementById('role').value;
+    const domains = {
+      teacher: 'tch.vtiu.edu.gh',
+      finance_admin: 'finance.vtiu.edu.gh',
+      academic_admin: 'academics.vtiu.edu.gh',
+      admissions_admin: 'admissions.vtiu.edu.gh',
+      superadmin: 'admin.vtiu.edu.gh'
+    };
+
+    const emailField = document.getElementById('email');
+    if (!first || !last || !domains[role]) {
+      emailField.value = '';
+      return;
+    }
+
+    emailField.value = `${first[0]}${middle ? middle[0] : ''}${last}@${domains[role]}`;
+  }
+
+  ['first_name', 'middle_name', 'last_name'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateGeneratedEmail);
+  });
 
   function fetchAdminID(role) {
     const adminField = document.getElementById('admin_id');
@@ -508,3 +536,4 @@
   });
 </script>
 {% endblock %}
+
