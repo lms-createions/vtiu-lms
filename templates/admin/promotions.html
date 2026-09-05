@@ -820,7 +820,9 @@ function updateBulkActions() {
 function openVettingModal(studentId) {
     const modal = new bootstrap.Modal(document.getElementById('vettingModal'));
     // Load student details via AJAX
-    fetch(`{{ url_for('admin.api_get_student_vetting_details') }}?student_id=${studentId}`)
+    const detailsUrl = `{{ url_for('admin.api_get_student_vetting_details', student_id='__STUDENT_ID__') }}`
+        .replace('__STUDENT_ID__', encodeURIComponent(studentId));
+    fetch(`${detailsUrl}?academic_year=${encodeURIComponent(document.getElementById('academicYear').value)}`)
         .then(r => r.json())
         .then(data => {
             document.getElementById('vettingModalBody').innerHTML = `
