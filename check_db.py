@@ -1,31 +1,18 @@
-import sqlite3
 import os
+from sqlalchemy import inspect
 from app import app
+from utils.extensions import db
 
 print("Current directory:", os.getcwd())
-print("Database URI:", app.config.get('SQLALCHEMY_DATABASE_URI'))
+print("Database configured:", bool(app.config.get('SQLALCHEMY_DATABASE_URI')))
 
-# Extract database path from URI
-db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
-if db_uri.startswith('sqlite:///'):
-    db_path = db_uri[10:]  # Remove 'sqlite:///'
-else:
-    db_path = 'lms.db'
+with app.app_context():
+    database_inspector = inspect(db.engine)
+    tables = database_inspector.get_table_names()
+    print("Tables:", tables)
 
-print("Database path:", db_path)
-print("Database file exists:", os.path.exists(db_path))
-
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
-# Check tables
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-tables = cursor.fetchall()
-print("Tables:", tables)
-
-# Check if message table exists and its columns
-cursor.execute("PRAGMA table_info(message)")
-columns = cursor.fetchall()
-print("Message table columns:", columns)
-
-conn.close()
+    if "message" in tables:
+        columns = database_inspector.get_columns("message")
+        print("Message table columns:", [column["name"] for column in columns])
+    else:
+        print("Message table columns: table does not exist")
