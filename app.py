@@ -269,6 +269,21 @@ def initialize_database():
                 logger.info("✅ Some tables/indexes already exist - continuing...")
             else:
                 logger.warning(f"⚠️ db.create_all() warning: {e}")
+
+        # Repair partially initialized databases. A failed create_all() can
+        # leave later model tables absent even though their models are loaded.
+        logger.info("🔍 Checking every imported model table...")
+        existing_tables = set(inspect(db.engine).get_table_names())
+        for table in db.metadata.sorted_tables:
+            if table.name in existing_tables:
+                continue
+            try:
+                table.create(db.engine, checkfirst=True)
+                existing_tables.add(table.name)
+                logger.info(f"  ✓ {table.name} (created)")
+            except Exception as e:
+                logger.warning(f"  ⚠️ {table.name}: {e}")
+                db.session.rollback()
         
         # Double-check critical tables exist by trying to create them explicitly
         logger.info("🔍 Verifying critical tables...")
@@ -768,3 +783,4 @@ if __name__ == "__main__":
         debug=not IS_PRODUCTION,
         allow_unsafe_werkzeug=not IS_PRODUCTION
     )
+
