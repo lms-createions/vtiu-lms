@@ -106,59 +106,38 @@ def ensure_release_columns():
     """Ensure new columns exist on semester_result_release table (compatible with PostgreSQL)."""
 
     try:
+        from sqlalchemy import inspect, text
+        from models import SemesterResultRelease
 
-        from sqlalchemy import text
+        SemesterResultRelease.__table__.create(db.engine, checkfirst=True)
+        expected_columns = {
+            'submitted_by': 'INTEGER',
+            'submitted_by_name': 'TEXT',
+            'submitted_at': 'TIMESTAMP',
+            'submitted_note': 'TEXT',
+            'submitted_courses': 'TEXT',
+        }
 
-        conn = db.engine.connect()
-
-        # Use PostgreSQL syntax to get column information
-        res = conn.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'semester_result_release'
-        """))
-
-        cols = [r[0] for r in res.fetchall()]
-
-        to_add = []
-
-        if 'submitted_by' not in cols:
-
-            to_add.append("ALTER TABLE semester_result_release ADD COLUMN submitted_by INTEGER")
-
-        if 'submitted_by_name' not in cols:
-
-            to_add.append("ALTER TABLE semester_result_release ADD COLUMN submitted_by_name TEXT")
-
-        if 'submitted_at' not in cols:
-
-            to_add.append("ALTER TABLE semester_result_release ADD COLUMN submitted_at DATETIME")
-
-        if 'submitted_note' not in cols:
-
-            to_add.append("ALTER TABLE semester_result_release ADD COLUMN submitted_note TEXT")
-
-        if 'submitted_courses' not in cols:
-
-            to_add.append("ALTER TABLE semester_result_release ADD COLUMN submitted_courses TEXT")
-
-
-
-        for sql in to_add:
-
-            try:
-
-                conn.execute(text(sql))
-
-            except Exception:
-
-                logger.exception(f"Failed to add column with SQL: {sql}")
-
-        conn.close()
-
+        with db.engine.begin() as connection:
+            columns = {
+                column['name']
+                for column in inspect(connection).get_columns('semester_result_release')
+            }
+            for column_name, column_type in expected_columns.items():
+                if column_name not in columns:
+                    connection.execute(text(
+                        f'ALTER TABLE semester_result_release '
+                        f'ADD COLUMN {column_name} {column_type}'
+                    ))
     except Exception:
-
         logger.exception("Failed ensuring semester_result_release columns")
+
+
+def ensure_promotion_tables():
+    """Ensure promotion tables exist before promotion pages query them."""
+    from models import StudentPromotion
+
+    StudentPromotion.__table__.create(db.engine, checkfirst=True)
 
 
 
@@ -437,57 +416,27 @@ def dashboard():
     try:
 
         admin.update_last_login()
-
     except Exception as e:
-
         logger.warning(f"Could not update last login: {e}")
 
-    
-
     # ============================================================
-
     # ROUTE BY ROLE (with priority)
-
     # ============================================================
-
-    
-
-    # SuperAdmin - show comprehensive dashboard
 
     if admin.is_superadmin:
-
         logger.info(f"SuperAdmin {admin.admin_id} accessing main dashboard")
-
         return redirect(url_for('admin.superadmin_dashboard'))
 
-    
-
-    # Finance Admin
-
     elif admin.is_finance_admin:
-
         logger.info(f"Finance Admin {admin.admin_id} redirected to finance dashboard")
-
         return redirect(url_for('admin.finance_dashboard'))
 
-    
-
-    # Academic Admin
-
     elif admin.is_academic_admin:
-
         logger.info(f"Academic Admin {admin.admin_id} redirected to academic dashboard")
-
         return redirect(url_for('admin.academic_dashboard'))
 
-    
-
-    # Admissions Admin
-
     elif admin.is_admissions_admin:
-
         logger.info(f"Admissions Admin {admin.admin_id} redirected to admissions dashboard")
-
         return redirect(url_for('admin.admissions_dashboard'))
 
     
@@ -5417,8 +5366,7 @@ def manage_promotions():
 
         ]
 
-        
-
+        ensure_promotion_tables()
         # Get courses
 
         courses = Course.query.all() if hasattr(db.Model, 'Course') else []
@@ -8838,3 +8786,4 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('select_portal'))
+
