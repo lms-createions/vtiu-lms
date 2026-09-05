@@ -2210,7 +2210,7 @@ def register_user():
 
     middle_name = request.form.get('middle_name', '').strip()
 
-    email = (request.form.get('email') or '').strip() or None
+    email = None
 
     temp_password = request.form.get('password', '').strip()
 
@@ -2278,19 +2278,9 @@ def register_user():
 
 
 
-    # Check email uniqueness across users and admins
-
-    if email:
-
-        existing_user = User.query.filter_by(email=email).first()
-
-        existing_admin = Admin.query.filter_by(email=email).first()
-
-        if existing_user or existing_admin:
-
-            flash("❌ Email already in use. Use a different email.", 'danger')
-
-            return redirect(url_for('admin.register_user'))
+    # Generate the login email from the name and role. This is authoritative
+    # so manually entered or reused addresses cannot create duplicate accounts.
+    email = generate_unique_email(first_name, middle_name, last_name, role)
 
 
 
@@ -2820,6 +2810,37 @@ def clean(n):
 
     return re.sub(r'[^a-zA-Z]', '', (n or '')).lower().strip()
 
+
+
+def generate_unique_email(first_name, middle_name, last_name, role):
+    """Generate a unique role-specific institutional email address."""
+    first = clean(first_name)
+    middle = clean(middle_name)
+    last = clean(last_name)
+
+    if not first and middle:
+        first, middle = middle, ''
+    if not first or not last:
+        raise ValueError("First name and last name are required")
+
+    local_part = first[0] + (middle[0] if middle else '') + last
+    domain_map = {
+        'student': 'st.vtiu.edu.gh',
+        'teacher': 'tch.vtiu.edu.gh',
+        'finance_admin': 'finance.vtiu.edu.gh',
+        'academic_admin': 'academics.vtiu.edu.gh',
+        'admissions_admin': 'admissions.vtiu.edu.gh',
+        'superadmin': 'admin.vtiu.edu.gh',
+    }
+    domain = domain_map.get(role.lower(), 'vtiu.edu.gh')
+
+    counter = 0
+    while True:
+        suffix = str(counter) if counter else ''
+        email = f"{local_part}{suffix}@{domain}"
+        if not User.query.filter_by(email=email).first() and not Admin.query.filter_by(email=email).first():
+            return email
+        counter += 1
 
 
 def generate_unique_username(first_name, middle_name, last_name, role):
