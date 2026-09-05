@@ -35,13 +35,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===== Configuration =====
-# Check if we're in production (Render deployment)
+# Check if we're in production (Render or Railway deployment)
 IS_PRODUCTION = bool(
     app.config.get("IS_PRODUCTION")
     or os.environ.get("IS_PRODUCTION") in ("1", "true", "True")
     or os.environ.get("FLASK_ENV", "").lower() == "production"
     or os.environ.get("RENDER") == "true"  # Render sets this automatically
     or "render.com" in os.environ.get("RENDER_EXTERNAL_URL", "")
+    or os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("RAILWAY_ENVIRONMENT_NAME")
+    or os.environ.get("RAILWAY_PROJECT_ID")
+    or os.environ.get("RAILWAY_SERVICE_ID")
 )
 
 logger.info(f"🌍 Environment: {'PRODUCTION (Render)' if IS_PRODUCTION else 'LOCAL DEVELOPMENT'}")
@@ -243,6 +247,17 @@ def initialize_database():
             ApplicationResult, ApplicationPayment
         )
         logger.info("✅ All models imported successfully")
+
+        # Keep existing PostgreSQL databases compatible with newly added model
+        # columns. db.create_all() does not alter existing tables.
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        admin_columns = {column["name"] for column in inspector.get_columns("admin")}
+        if "notes" not in admin_columns:
+            logger.info("🔧 Adding missing admin.notes column...")
+            with db.engine.begin() as connection:
+                connection.execute(text("ALTER TABLE admin ADD COLUMN notes TEXT"))
+            logger.info("✅ admin.notes column added")
         
         # Create all tables using db.create_all() - this is safest method
         logger.info("🔨 Creating all database tables...")
@@ -297,7 +312,6 @@ def initialize_database():
                     db.session.rollback()
         
         # Check how many tables were created
-        from sqlalchemy import inspect
         inspector = inspect(db.engine)
         all_tables = inspector.get_table_names()
         logger.info(f"📊 Total tables in database: {len(all_tables)}")
