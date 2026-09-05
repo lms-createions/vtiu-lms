@@ -7,18 +7,21 @@ class Config:
     # ------------------------------------------------------
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-    # DATABASE (Render-safe)
+    # DATABASE (Railway PostgreSQL)
     db_url = os.environ.get("DATABASE_URL")
 
-    if db_url:
-        SQLALCHEMY_DATABASE_URI = db_url.replace(
-            "postgres://", "postgresql://"
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL is required. Configure the Railway PostgreSQL "
+            "connection before starting the application."
         )
-        # Add SSL configuration for production databases
-        if "sslmode=" not in SQLALCHEMY_DATABASE_URI:
-            SQLALCHEMY_DATABASE_URI += "?sslmode=require"
-    else:
-        SQLALCHEMY_DATABASE_URI = "sqlite:///instance/lms.db"
+
+    SQLALCHEMY_DATABASE_URI = db_url.replace("postgres://", "postgresql://", 1)
+
+    # Railway PostgreSQL requires SSL for external connections.
+    if "sslmode=" not in SQLALCHEMY_DATABASE_URI:
+        separator = "&" if "?" in SQLALCHEMY_DATABASE_URI else "?"
+        SQLALCHEMY_DATABASE_URI += f"{separator}sslmode=require"
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
