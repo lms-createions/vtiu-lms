@@ -543,6 +543,59 @@ def health():
             'error': str(e)
         }), 500
 
+
+@app.route('/api/login', methods=['POST'])
+def mobile_login():
+    """Authenticate the Android client against the shared LMS database."""
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    user_id = (data.get('user_id') or '').strip()
+    password = data.get('password') or ''
+    role = (data.get('role') or '').strip().lower()
+
+    if not username or not user_id or not password:
+        return jsonify({
+            'success': False,
+            'message': 'username, user_id, and password are required'
+        }), 400
+
+    from models import Admin, User
+
+    account = None
+    if role in {'finance_admin', 'academic_admin', 'admissions_admin', 'superadmin', 'admin'}:
+        account = Admin.query.filter_by(admin_id=user_id).first()
+        valid = account and account.username.lower() == username.lower() and account.check_password(password)
+    else:
+        account = User.query.filter_by(user_id=user_id).first()
+        valid = account and account.username.lower() == username.lower() and account.check_password(password)
+
+    if not valid:
+        return jsonify({'success': False, 'message': 'Invalid login credentials'}), 401
+
+    if isinstance(account, Admin):
+        account_role = 'superadmin' if account.is_superadmin else account.role
+        name = account.username
+        department = account.department
+        profile_picture = account.profile_picture
+    else:
+        account_role = account.role
+        name = f"{account.first_name} {account.last_name}".strip()
+        department = None
+        profile_picture = account.profile_picture
+
+    return jsonify({
+        'success': True,
+        'message': 'Login successful',
+        'user': {
+            'id': account.id,
+            'user_id': getattr(account, 'user_id', None) or account.admin_id,
+            'name': name,
+            'role': account_role,
+            'department': department,
+            'profile_picture_url': profile_picture,
+        }
+    }), 200
+
 # ===== Database Initialization Routes =====
 
 @app.route('/init-db')
