@@ -5720,6 +5720,22 @@ def api_get_promotion_candidates():
     })
 
 
+@admin_bp.route('/promotion-candidates/<student_id>', methods=['GET'])
+@login_required
+def api_get_student_vetting_details(student_id):
+    """Return the student details required by the promotion review modal."""
+    student = StudentProfile.query.filter_by(user_id=student_id).first_or_404()
+    user = User.query.filter_by(user_id=student_id).first()
+    return jsonify({
+        'student_id': student_id,
+        'name': user.full_name if user else 'Unknown',
+        'programme': student.current_programme,
+        'gpa': calculate_yearly_gpa(student_id, request.args.get('academic_year'))
+        if request.args.get('academic_year') else 0,
+        'courses': [],
+    })
+
+
 
 
 
