@@ -80,7 +80,7 @@
                         <select id="course" name="course" class="form-control select-multi" multiple>
                             <option value="">-- Select Courses --</option>
                             {% for course in courses %}
-                                <option value="{{ course.course_code }}">{{ course.course_code }} - {{ course.course_name }}</option>
+                                <option value="{{ course.code }}">{{ course.code }} - {{ course.name }}</option>
                             {% endfor %}
                         </select>
                         <small class="form-text text-muted">Hold Ctrl to select multiple</small>
