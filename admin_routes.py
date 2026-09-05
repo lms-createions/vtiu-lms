@@ -5333,7 +5333,7 @@ def promote_all_students():
 
 
 
-@admin_bp.route('/admin/manage-promotions', methods=['GET', 'POST'])
+@admin_bp.route('/manage-promotions', methods=['GET', 'POST'])
 
 @login_required
 
@@ -5385,15 +5385,13 @@ def manage_promotions():
 
         programmes = db.session.query(
 
-            StudentProfile.programme_code,
-
-            StudentProfile.programme_name
+            StudentProfile.current_programme
 
         ).distinct().all()
 
         programmes = [
 
-            {'programme_code': p[0], 'programme_name': p[1]} 
+            {'programme_code': p[0], 'programme_name': p[0]}
 
             for p in programmes if p[0]
 
@@ -5402,13 +5400,13 @@ def manage_promotions():
         ensure_promotion_tables()
         # Get courses
 
-        courses = Course.query.all() if hasattr(db.Model, 'Course') else []
+        courses = Course.query.all()
 
         
 
         return render_template(
 
-            'admin/manage_promotions.html',
+            'admin/promotions.html',
 
             current_year=current_year,
 
@@ -5592,13 +5590,18 @@ def get_promotion_candidates(academic_year, filters=None):
 
     if filters.get('programmes'):
 
-        query = query.filter(StudentProfile.programme_code.in_(filters['programmes']))
+        query = query.filter(StudentProfile.current_programme.in_(filters['programmes']))
 
     
 
     if filters.get('levels'):
 
-        query = query.filter(StudentProfile.programme_level.in_(filters['levels']))
+        query = query.filter(StudentProfile.programme_level.in_(
+            [int(level) for level in filters['levels']]
+        ))
+
+    if filters.get('statuses'):
+        query = query.filter(StudentProfile.academic_status.in_(filters['statuses']))
 
     
 
@@ -5634,7 +5637,7 @@ def get_promotion_candidates(academic_year, filters=None):
 
             'name': user.full_name if user else 'Unknown',
 
-            'programme': student.programme_name,
+            'programme': student.current_programme,
 
             'level': student.programme_level,
 
@@ -8819,3 +8822,4 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('select_portal'))
+
