@@ -258,6 +258,23 @@ def initialize_database():
             with db.engine.begin() as connection:
                 connection.execute(text("ALTER TABLE admin ADD COLUMN notes TEXT"))
             logger.info("✅ admin.notes column added")
+
+        student_profile_columns = {
+            column["name"]
+            for column in inspector.get_columns("student_profile")
+        }
+        with db.engine.begin() as connection:
+            if "vetting_status" not in student_profile_columns:
+                logger.info("🔧 Adding missing student_profile.vetting_status column...")
+                connection.execute(text(
+                    "ALTER TABLE student_profile "
+                    "ADD COLUMN vetting_status VARCHAR(20) DEFAULT 'pending'"
+                ))
+            if "rejection_reason" not in student_profile_columns:
+                logger.info("🔧 Adding missing student_profile.rejection_reason column...")
+                connection.execute(text(
+                    "ALTER TABLE student_profile ADD COLUMN rejection_reason TEXT"
+                ))
         
         # Create all tables using db.create_all() - this is safest method
         logger.info("🔨 Creating all database tables...")
