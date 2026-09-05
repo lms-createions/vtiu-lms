@@ -74,12 +74,6 @@
               </div>
 
               <div class="col-md-12">
-                <label for="email" class="form-label">Login Email</label>
-                <input type="email" name="email" id="email" class="form-control form-control-sm" readonly>
-                <small id="generatedEmailHint" class="form-text text-muted" aria-live="polite">Select a role and enter the name to generate an email.</small>
-              </div>
-
-              <div class="col-md-12">
                 <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
                 <select name="role" id="role" class="form-select form-select-sm" required onchange="updateRoleDisplay()">
                   <option value="">— Select Role —</option>
@@ -92,6 +86,12 @@
                   {% endif %}
                 </select>
                 <small id="roleInfo" class="form-text text-muted mt-2"></small>
+              </div>
+
+              <div class="col-md-12">
+                <label for="email" class="form-label">Login Email</label>
+                <input type="email" name="email" id="email" class="form-control form-control-sm" readonly>
+                <small id="generatedEmailHint" class="form-text text-muted" aria-live="polite">Select a role and enter the name to generate an email.</small>
               </div>
 
               <div class="col-md-12">
