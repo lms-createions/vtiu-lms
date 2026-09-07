@@ -2172,6 +2172,7 @@ def register_user():
 
         form.role.choices = [
 
+            ('student', 'Student'),
             ('teacher', 'Teacher'),
 
             ('finance_admin', 'Finance Admin'),
@@ -2186,13 +2187,19 @@ def register_user():
 
     else:
 
-        form.role.choices = [('teacher', 'Teacher')]
+        form.role.choices = [('student', 'Student'), ('teacher', 'Teacher')]
 
 
 
     if request.method == 'GET':
 
-        return render_template('admin/register_user.html', form=form, is_superadmin=current_user.is_superadmin)
+        programmes = [p for p in CERTIFICATE_PROGRAMMES + DIPLOMA_PROGRAMMES if p[0]]
+        return render_template(
+            'admin/register_user.html',
+            form=form,
+            is_superadmin=current_user.is_superadmin,
+            programmes=programmes
+        )
 
 
 
@@ -2224,7 +2231,7 @@ def register_user():
 
 
 
-    if not current_user.is_superadmin and role != 'teacher':
+    if not current_user.is_superadmin and role not in {'student', 'teacher'}:
 
         flash("❌ Only Superadmin can create Admins.", 'danger')
 
@@ -2286,7 +2293,66 @@ def register_user():
 
     try:
 
+        # ======================================================
+        # STUDENT REGISTRATION (User + StudentProfile)
+        # ======================================================
+        if role == 'student':
+            programme = request.form.get('current_programme', '').strip()
+            level_str = request.form.get('programme_level', '').strip()
 
+            if not programme or not level_str:
+                flash("❌ Programme and level are required for students.", 'danger')
+                return redirect(url_for('admin.register_user'))
+
+            try:
+                programme_level = int(level_str)
+            except ValueError:
+                flash("❌ Invalid programme level.", 'danger')
+                return redirect(url_for('admin.register_user'))
+
+            prefix = 'STD'
+            count = User.query.filter_by(role='student').count() + 1
+            while User.query.filter_by(user_id=f"{prefix}{count:03d}").first():
+                count += 1
+            user_id = f"{prefix}{count:03d}"
+
+            new_user = User(
+                user_id=user_id,
+                username=username,
+                email=email,
+                first_name=first_name,
+                middle_name=middle_name,
+                last_name=last_name,
+                role='student',
+                profile_picture=profile_picture
+            )
+            new_user.set_password(temp_password)
+            db.session.add(new_user)
+            db.session.flush()
+
+            dob_str = request.form.get('dob', '').strip()
+            dob = datetime.strptime(dob_str, '%Y-%m-%d') if dob_str else None
+            db.session.add(StudentProfile(
+                user_id=user_id,
+                dob=dob,
+                gender=request.form.get('gender', '').strip(),
+                nationality=request.form.get('nationality', '').strip(),
+                phone=request.form.get('phone', '').strip(),
+                email=email or '',
+                current_programme=programme,
+                programme_level=programme_level,
+                study_format=request.form.get('study_format', 'Regular').strip(),
+                academic_year=request.form.get('academic_year', '').strip(),
+                semester=request.form.get('semester', '').strip(),
+                index_number=request.form.get('index_number', '').strip() or None,
+                admission_date=datetime.now().date()
+            ))
+            db.session.commit()
+            flash(
+                f"✅ Student registered! Student ID: {user_id} | Username: {username} | Password: {temp_password}",
+                'success'
+            )
+            return redirect(url_for('admin.dashboard'))
 
         # ======================================================
 
