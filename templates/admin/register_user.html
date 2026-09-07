@@ -77,6 +77,7 @@
                 <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
                 <select name="role" id="role" class="form-select form-select-sm" required onchange="updateRoleDisplay()">
                   <option value="">— Select Role —</option>
+x                  <option value="student">Student (@st.vtiu.edu.gh)</option>
                   <option value="teacher">Teacher</option>
                   {% if is_superadmin %}
                     <option value="finance_admin">💰 Finance Admin</option>
@@ -107,6 +108,74 @@
                 <div id="pwStrengthText" class="small mt-1 text-muted">Strength: —</div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== STUDENT-SPECIFIC FIELDS ====== -->
+    <div id="student-fields" class="role-section card shadow-sm mb-4">
+      <div class="card-header"><strong>🎓 Student Information</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="student_dob" class="form-label">Date of Birth</label>
+            <input type="date" name="dob" id="student_dob" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="student_gender" class="form-label">Gender</label>
+            <select name="gender" id="student_gender" class="form-select">
+              <option value="">Select Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label for="current_programme" class="form-label">Programme <span class="text-danger">*</span></label>
+            <select name="current_programme" id="current_programme" class="form-select">
+              <option value="">Select Programme</option>
+              {% for programme in programmes %}
+                <option value="{{ programme[0] }}">{{ programme[1] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label for="programme_level" class="form-label">Level <span class="text-danger">*</span></label>
+            <select name="programme_level" id="programme_level" class="form-select">
+              <option value="">Select Level</option>
+              <option value="100">Level 100</option>
+              <option value="200">Level 200</option>
+              <option value="300">Level 300</option>
+              <option value="400">Level 400</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="study_format" class="form-label">Study Format</label>
+            <select name="study_format" id="study_format" class="form-select">
+              <option value="Regular">Regular</option>
+              <option value="Online">Online</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="academic_year" class="form-label">Academic Year</label>
+            <input type="text" name="academic_year" id="academic_year" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label for="semester" class="form-label">Semester</label>
+            <select name="semester" id="semester" class="form-select">
+              <option value="">Select Semester</option>
+              <option value="1">Semester 1</option>
+              <option value="2">Semester 2</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label for="index_number" class="form-label">Index Number</label>
+            <input type="text" name="index_number" id="index_number" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="phone" class="form-label">Phone Number</label>
+            <input type="tel" name="phone" id="phone" class="form-control">
           </div>
         </div>
       </div>
@@ -324,7 +393,13 @@
     document.getElementById('permissions-section').classList.add('d-none');
     
     // Show relevant sections
-    if (role === 'teacher') {
+    if (role === 'student') {
+      document.getElementById('student-fields').classList.add('active');
+      document.getElementById('teacher-fields').classList.remove('active');
+      document.getElementById('admin-fields').classList.remove('active');
+      document.getElementById('roleInfo').textContent = '✓ Student registration using the @st.vtiu.edu.gh email domain';
+    }
+    else if (role === 'teacher') {
       document.getElementById('teacher-fields').classList.add('active');
       document.getElementById('admin-fields').classList.remove('active');
       document.getElementById('roleInfo').textContent = '✓ Teacher registration';
@@ -358,6 +433,7 @@
     const last = clean(document.getElementById('last_name').value);
     const role = document.getElementById('role').value;
     const domains = {
+      student: 'st.vtiu.edu.gh',
       teacher: 'tch.vtiu.edu.gh',
       finance_admin: 'finance.vtiu.edu.gh',
       academic_admin: 'academics.vtiu.edu.gh',
