@@ -2574,6 +2574,107 @@ def register_user():
 
 
 
+@admin_bp.route('/users')
+@login_required
+def manage_users():
+    """List student and teacher accounts that a superadmin can edit."""
+    if not isinstance(current_user, Admin) or not current_user.is_superadmin:
+        abort(403)
+
+    users = User.query.filter(User.role.in_(['student', 'teacher'])).order_by(
+        User.last_name, User.first_name
+    ).all()
+    return render_template('admin/manage_users.html', users=users)
+
+
+@admin_bp.route('/users/<string:user_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    """Update a student or teacher account and its related profile."""
+    if not isinstance(current_user, Admin) or not current_user.is_superadmin:
+        abort(403)
+
+    user = User.query.filter_by(user_id=user_id).first_or_404()
+    if user.role not in {'student', 'teacher'}:
+        abort(403)
+
+    profile = user.student_profile if user.role == 'student' else user.teacher_profile
+
+    if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '').strip()
+
+        if not first_name or not last_name or not email:
+            flash('First name, last name, and email are required.', 'danger')
+            return redirect(url_for('admin.edit_user', user_id=user.user_id))
+
+        duplicate_email = User.query.filter(
+            User.email == email, User.user_id != user.user_id
+        ).first()
+        if duplicate_email or Admin.query.filter_by(email=email).first():
+            flash('That email address is already in use.', 'danger')
+            return redirect(url_for('admin.edit_user', user_id=user.user_id))
+
+        user.first_name = first_name
+        user.middle_name = request.form.get('middle_name', '').strip() or None
+        user.last_name = last_name
+        user.email = email
+
+        if password:
+            if len(password) < 8:
+                flash('Password must be at least 8 characters.', 'danger')
+                return redirect(url_for('admin.edit_user', user_id=user.user_id))
+            user.set_password(password)
+
+        if profile:
+            dob_value = request.form.get('dob', '').strip()
+            try:
+                profile.dob = datetime.strptime(dob_value, '%Y-%m-%d').date() if dob_value else None
+            except ValueError:
+                flash('Date of birth must be a valid date.', 'danger')
+                return redirect(url_for('admin.edit_user', user_id=user.user_id))
+            profile.gender = request.form.get('gender', '').strip() or None
+            profile.phone = request.form.get('phone', '').strip() or None
+
+            if user.role == 'student':
+                profile.current_programme = request.form.get('current_programme', '').strip()
+                level = request.form.get('programme_level', '').strip()
+                if not profile.current_programme or not level:
+                    flash('Programme and level are required for students.', 'danger')
+                    return redirect(url_for('admin.edit_user', user_id=user.user_id))
+                try:
+                    profile.programme_level = int(level)
+                except ValueError:
+                    flash('Programme level must be a number.', 'danger')
+                    return redirect(url_for('admin.edit_user', user_id=user.user_id))
+                profile.study_format = request.form.get('study_format', '').strip() or None
+                profile.academic_year = request.form.get('academic_year', '').strip() or None
+                profile.semester = request.form.get('semester', '').strip() or None
+                profile.index_number = request.form.get('index_number', '').strip() or None
+            else:
+                profile.nationality = request.form.get('nationality', '').strip() or None
+                profile.qualification = request.form.get('qualification', '').strip() or None
+                profile.specialization = request.form.get('specialization', '').strip() or None
+                profile.department = request.form.get('department', '').strip() or None
+                profile.employment_type = request.form.get('employment_type', '').strip() or None
+
+        try:
+            db.session.commit()
+            flash(f'{user.full_name} was updated successfully.', 'success')
+        except (ValueError, IntegrityError) as exc:
+            db.session.rollback()
+            logger.warning('Failed updating user %s: %s', user.user_id, exc)
+            flash('Could not save the changes. Check the values and try again.', 'danger')
+        return redirect(url_for('admin.edit_user', user_id=user.user_id))
+
+    programmes = [p for p in CERTIFICATE_PROGRAMMES + DIPLOMA_PROGRAMMES if p[0]]
+    return render_template(
+        'admin/edit_user.html', user=user, profile=profile, programmes=programmes
+    )
+
+
 # ============================================================
 
 # HELPER ROUTE: Get available admin roles for the current user
