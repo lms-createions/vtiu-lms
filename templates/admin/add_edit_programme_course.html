@@ -90,7 +90,8 @@
           <label class="form-label fw-bold">
             <i class="fas fa-calendar text-danger"></i> {{ form.academic_year.label }}
           </label>
-          {{ form.academic_year(class="form-control", placeholder="e.g. 2025") }}
+          <input type="text" class="form-control" value="{{ current_academic_year or 'Not configured' }}" readonly>
+          <input type="hidden" name="academic_year" value="{{ current_academic_year or '' }}">
           {% for err in form.academic_year.errors %}
             <div class="text-danger small">{{ err }}</div>
           {% endfor %}
