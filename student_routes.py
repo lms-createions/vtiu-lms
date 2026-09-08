@@ -2,7 +2,7 @@ import re
 
 from flask import Blueprint, current_app, render_template, abort, redirect, url_for, flash, jsonify, session, send_from_directory, send_file, make_response
 
-import json, os
+import json, os, secrets, requests
 
 from flask import request
 
@@ -1736,6 +1736,9 @@ def pay_fees():
     
     # POST: Submit payment
     if request.method == 'POST':
+        if request.form.get('method') == 'paystack':
+            flash("Please use the Paystack checkout button to complete this payment.", "warning")
+            return redirect(url_for('student.pay_fees', year=year, semester=semester))
         amount = float(request.form.get('amount', 0))
         
         # VALIDATION: Base payment requirement
@@ -1760,6 +1763,7 @@ def pay_fees():
             semester=semester,
             amount=amount,
             description=description,
+            payment_method=request.form.get('method') or 'manual',
             is_approved=False,
             timestamp=datetime.utcnow()
         )
@@ -1799,8 +1803,158 @@ def pay_fees():
         student_level=int(level),
         base_payment_required=base_payment_required if fee_settings else total_fee,
         base_payment_deadline=base_payment_deadline,
-        fee_settings=fee_settings
+        fee_settings=fee_settings,
+        paystack_mode=(fee_structures[0].paystack_mode if fee_structures else 'test')
     )
+
+
+@student_bp.route('/paystack/initialize', methods=['POST'])
+@login_required
+def paystack_initialize():
+    """Create a Paystack checkout for the selected school-fee amount."""
+    if current_user.role != 'student':
+        abort(403)
+
+    payload = request.get_json(silent=True) or request.form
+    year = payload.get('year') or str(datetime.now().year)
+    semester = payload.get('semester') or 'First'
+    profile = StudentProfile.query.filter_by(user_id=current_user.user_id).first()
+    if not profile:
+        return jsonify({'success': False, 'message': 'Student profile not found.'}), 400
+
+    level = str(int(profile.programme_level)) if profile.programme_level else '100'
+    fee_structures = ProgrammeFeeStructure.query.filter_by(
+        programme_name=profile.current_programme,
+        programme_level=level,
+        study_format=profile.study_format or 'Regular',
+        academic_year=year,
+        semester=semester
+    ).all()
+    total_fee = sum(f.amount for f in fee_structures) if fee_structures else 0.0
+    approved_total = db.session.query(db.func.coalesce(db.func.sum(StudentFeeTransaction.amount), 0)).filter_by(
+        student_id=current_user.id, academic_year=year, semester=semester, is_approved=True
+    ).scalar() or 0
+    remaining = max(0, float(total_fee) - float(approved_total))
+
+    try:
+        amount = float(payload.get('amount', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid payment amount.'}), 400
+    if amount <= 0 or amount > remaining:
+        return jsonify({'success': False, 'message': f'Amount must be between 0 and GHS {remaining:.2f}.'}), 400
+    if not fee_structures:
+        return jsonify({'success': False, 'message': 'No fee structure found for this period.'}), 400
+
+    mode = fee_structures[0].paystack_mode if fee_structures[0].paystack_mode in {'test', 'live'} else 'test'
+    secret_key = current_app.config.get(f'PAYSTACK_{mode.upper()}_SECRET_KEY')
+    if not secret_key:
+        return jsonify({'success': False, 'message': f'Paystack {mode} mode is not configured.'}), 503
+
+    reference = f"fees-{current_user.user_id}-{secrets.token_urlsafe(16)}"
+    transaction = StudentFeeTransaction(
+        student_id=current_user.id,
+        academic_year=year,
+        semester=semester,
+        amount=round(amount, 2),
+        description=payload.get('description') or 'School Fees - Paystack',
+        payment_method='paystack',
+        paystack_mode=mode,
+        paystack_reference=reference,
+        is_approved=False,
+        timestamp=datetime.utcnow()
+    )
+    db.session.add(transaction)
+
+    callback_url = (
+        current_app.config.get(f'PAYSTACK_{mode.upper()}_CALLBACK_URL')
+        or current_app.config.get('PAYSTACK_CALLBACK_URL')
+        or url_for(
+        'student.paystack_verify', reference=reference, _external=True
+        )
+    )
+    try:
+        response = requests.post(
+            'https://api.paystack.co/transaction/initialize',
+            headers={'Authorization': f'Bearer {secret_key}', 'Content-Type': 'application/json'},
+            json={
+                'email': current_user.email,
+                'amount': int(round(amount * 100)),
+                'currency': current_app.config.get('PAYSTACK_CURRENCY', 'GHS'),
+                'reference': reference,
+                'callback_url': callback_url,
+                'metadata': {'student_id': current_user.user_id, 'academic_year': year, 'semester': semester}
+            },
+            timeout=20
+        )
+        result = response.json()
+        if not response.ok or not result.get('status') or not result.get('data', {}).get('authorization_url'):
+            db.session.rollback()
+            return jsonify({'success': False, 'message': result.get('message', 'Paystack initialization failed.')}), 502
+        db.session.commit()
+        return jsonify({'success': True, 'authorization_url': result['data']['authorization_url'], 'reference': reference})
+    except (requests.RequestException, ValueError) as exc:
+        db.session.rollback()
+        current_app.logger.exception('Paystack initialization failed: %s', exc)
+        return jsonify({'success': False, 'message': 'Unable to connect to Paystack.'}), 502
+
+
+@student_bp.route('/paystack/verify/<string:reference>')
+@login_required
+def paystack_verify(reference):
+    """Verify a Paystack reference and approve the matching local transaction."""
+    if current_user.role != 'student':
+        abort(403)
+    transaction = StudentFeeTransaction.query.filter_by(
+        paystack_reference=reference, student_id=current_user.id, payment_method='paystack'
+    ).first_or_404()
+    if transaction.is_approved:
+        flash('This Paystack payment is already confirmed.', 'info')
+        return redirect(url_for('student.pay_fees', year=transaction.academic_year, semester=transaction.semester))
+
+    mode = transaction.paystack_mode if transaction.paystack_mode in {'test', 'live'} else 'test'
+    secret_key = current_app.config.get(f'PAYSTACK_{mode.upper()}_SECRET_KEY')
+    if not secret_key:
+        flash(f'Paystack {mode} mode is not configured.', 'danger')
+        return redirect(url_for('student.pay_fees', year=transaction.academic_year, semester=transaction.semester))
+
+    try:
+        response = requests.get(
+            f'https://api.paystack.co/transaction/verify/{reference}',
+            headers={'Authorization': f'Bearer {secret_key}'}, timeout=20
+        )
+        result = response.json()
+        data = result.get('data') or {}
+        expected_amount = int(round(transaction.amount * 100))
+        currency = current_app.config.get('PAYSTACK_CURRENCY', 'GHS')
+        valid = (
+            response.ok and result.get('status') and data.get('status') == 'success'
+            and data.get('reference') == reference
+            and int(data.get('amount', 0)) == expected_amount
+            and data.get('currency') == currency
+        )
+        if not valid:
+            flash('Paystack could not verify this payment.', 'danger')
+        else:
+            transaction.is_approved = True
+            transaction.timestamp = datetime.utcnow()
+            db.session.commit()
+            flash(f'Payment of GHS {transaction.amount:.2f} confirmed successfully.', 'success')
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        db.session.rollback()
+        current_app.logger.exception('Paystack verification failed: %s', exc)
+        flash('Unable to verify the Paystack payment right now.', 'danger')
+    return redirect(url_for('student.pay_fees', year=transaction.academic_year, semester=transaction.semester))
+
+
+@student_bp.route('/paystack/callback')
+@login_required
+def paystack_callback():
+    """Accept a fixed Paystack callback URL and verify its reference."""
+    reference = request.args.get('reference', '').strip()
+    if not reference:
+        flash('Paystack did not return a payment reference.', 'danger')
+        return redirect(url_for('student.pay_fees'))
+    return paystack_verify(reference)
 
 
 @student_bp.route('/download-receipt/<int:txn_id>')
