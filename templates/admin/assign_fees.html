@@ -143,13 +143,22 @@
 
         <div class="col-md-3 col-6">
           <label for="class_level" class="form-label small fw-semibold">Class Level <span class="text-warning">*</span></label>
-          <select id="class_level" name="class_level" class="form-select form-select-sm" required>
+          <select id="class_level" name="programme_level" class="form-select form-select-sm" required>
             <option value="">-- Select --</option>
             <option value="100">100 Level</option>
             <option value="200">200 Level</option>
             <option value="300">300 Level</option>
             <option value="400">400 Level</option>
           </select>
+        </div>
+
+        <div class="col-md-3 col-6">
+          <label for="paystack_mode" class="form-label small fw-semibold">Paystack Mode</label>
+          <select id="paystack_mode" name="paystack_mode" class="form-select form-select-sm">
+            <option value="test">Test</option>
+            <option value="live">Live</option>
+          </select>
+          <small class="form-text text-muted">Choose Test while validating payments.</small>
         </div>
 
         <div class="col-md-3 col-6 text-end">
