@@ -217,6 +217,11 @@ def assign_fees():
         academic_year_id = request.form.get('academic_year')
         semester = request.form.get('semester')
         group_title = request.form.get('group_title') or 'Default'
+        paystack_mode = request.form.get('paystack_mode', 'test').strip().lower()
+
+        if paystack_mode not in {'test', 'live'}:
+            flash("Invalid Paystack mode.", "danger")
+            return redirect(url_for('finance.assign_fees'))
 
         if not programme_name or not programme_level or not academic_year_id or not semester:
             flash("Missing required fields.", "danger")
@@ -269,7 +274,8 @@ def assign_fees():
                 semester=semester,
                 description=group_title,
                 amount=round(total, 2),
-                items=json.dumps(items)
+                items=json.dumps(items),
+                paystack_mode=paystack_mode
             )
 
             db.session.add(new_group)
@@ -323,6 +329,7 @@ def edit_fee_group(group_id):
             group.study_format = request.form.get('study_format') or 'Regular'
             group.semester = request.form.get('semester')
             group.description = request.form.get('group_title')
+            group.paystack_mode = request.form.get('paystack_mode', 'test').strip().lower()
 
             descriptions = request.form.getlist('description[]')
             amounts = request.form.getlist('amount[]')
