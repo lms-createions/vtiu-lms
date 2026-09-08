@@ -159,7 +159,8 @@ x                  <option value="student">Student (@st.vtiu.edu.gh)</option>
           </div>
           <div class="col-md-4">
             <label for="academic_year" class="form-label">Academic Year</label>
-            <input type="text" name="academic_year" id="academic_year" class="form-control">
+            <input type="text" id="academic_year_display" class="form-control" value="{{ current_academic_year or 'Not configured' }}" readonly>
+            <input type="hidden" name="academic_year" value="{{ current_academic_year or '' }}">
           </div>
           <div class="col-md-4">
             <label for="semester" class="form-label">Semester</label>
@@ -621,4 +622,3 @@ x                  <option value="student">Student (@st.vtiu.edu.gh)</option>
   });
 </script>
 {% endblock %}
-
