@@ -1,0 +1,139 @@
+{% extends "admin/layout.html" %}
+{% block title %}Edit {{ user.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1"><i class="fas fa-user-edit me-2 text-primary"></i>Edit User</h2>
+      <p class="text-muted mb-0">{{ user.user_id }} | {{ user.role|title }}</p>
+    </div>
+    <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-1"></i>Back to Users
+    </a>
+  </div>
+
+  <form method="POST" class="card shadow-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">User ID</label>
+          <input class="form-control" value="{{ user.user_id }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Username</label>
+          <input class="form-control" value="{{ user.username }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Role</label>
+          <input class="form-control" value="{{ user.role|title }}" readonly>
+        </div>
+
+        <div class="col-md-4">
+          <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+          <input id="first_name" name="first_name" class="form-control" value="{{ user.first_name or '' }}" required>
+        </div>
+        <div class="col-md-4">
+          <label for="middle_name" class="form-label">Middle Name</label>
+          <input id="middle_name" name="middle_name" class="form-control" value="{{ user.middle_name or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+          <input id="last_name" name="last_name" class="form-control" value="{{ user.last_name or '' }}" required>
+        </div>
+        <div class="col-md-6">
+          <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+          <input id="email" name="email" type="email" class="form-control" value="{{ user.email or '' }}" required>
+        </div>
+        <div class="col-md-6">
+          <label for="password" class="form-label">New Password</label>
+          <input id="password" name="password" type="password" class="form-control" minlength="8" autocomplete="new-password">
+          <small class="text-muted">Leave blank to keep the current password.</small>
+        </div>
+
+        {% if profile %}
+        <div class="col-md-4">
+          <label for="dob" class="form-label">Date of Birth</label>
+          <input id="dob" name="dob" type="date" class="form-control" value="{{ profile.dob.strftime('%Y-%m-%d') if profile.dob else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="gender" class="form-label">Gender</label>
+          <select id="gender" name="gender" class="form-select">
+            <option value="">Select Gender</option>
+            {% for option in ['Male', 'Female', 'Other'] %}
+            <option value="{{ option }}" {% if profile.gender == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="phone" class="form-label">Phone</label>
+          <input id="phone" name="phone" class="form-control" value="{{ profile.phone or '' }}">
+        </div>
+
+        {% if user.role == 'student' %}
+        <div class="col-md-6">
+          <label for="current_programme" class="form-label">Programme <span class="text-danger">*</span></label>
+          <select id="current_programme" name="current_programme" class="form-select" required>
+            <option value="">Select Programme</option>
+            {% for programme in programmes %}
+            <option value="{{ programme[0] }}" {% if profile.current_programme == programme[0] %}selected{% endif %}>{{ programme[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="programme_level" class="form-label">Level <span class="text-danger">*</span></label>
+          <select id="programme_level" name="programme_level" class="form-select" required>
+            {% for level in [100, 200, 300, 400] %}
+            <option value="{{ level }}" {% if profile.programme_level == level %}selected{% endif %}>{{ level }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="study_format" class="form-label">Study Format</label>
+          <input id="study_format" name="study_format" class="form-control" value="{{ profile.study_format or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="academic_year" class="form-label">Academic Year</label>
+          <input id="academic_year" name="academic_year" class="form-control" value="{{ profile.academic_year or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="semester" class="form-label">Semester</label>
+          <input id="semester" name="semester" class="form-control" value="{{ profile.semester or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="index_number" class="form-label">Index Number</label>
+          <input id="index_number" name="index_number" class="form-control" value="{{ profile.index_number or '' }}">
+        </div>
+        {% else %}
+        <div class="col-md-4">
+          <label for="nationality" class="form-label">Nationality</label>
+          <input id="nationality" name="nationality" class="form-control" value="{{ profile.nationality or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="qualification" class="form-label">Qualification</label>
+          <input id="qualification" name="qualification" class="form-control" value="{{ profile.qualification or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label for="specialization" class="form-label">Specialization</label>
+          <input id="specialization" name="specialization" class="form-control" value="{{ profile.specialization or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label for="department" class="form-label">Department</label>
+          <input id="department" name="department" class="form-control" value="{{ profile.department or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label for="employment_type" class="form-label">Employment Type</label>
+          <input id="employment_type" name="employment_type" class="form-control" value="{{ profile.employment_type or '' }}">
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+      <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Changes</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
