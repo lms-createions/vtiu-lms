@@ -10,10 +10,9 @@
     <form method="GET" class="row g-2 mb-3">
 
         <div class="col-md-3">
-            <input type="text" name="academic_year"
-                   value="{{ academic_year_filter or '' }}"
-                   class="form-control form-control-sm"
-                   placeholder="Academic Year (2025/2026)">
+                 <input type="text" value="{{ current_academic_year or 'Not configured' }}"
+                     class="form-control form-control-sm" readonly>
+                 <input type="hidden" name="academic_year" value="{{ current_academic_year or '' }}">
         </div>
 
         <div class="col-md-2">
