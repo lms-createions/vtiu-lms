@@ -53,6 +53,7 @@ from utils.email import send_approval_credentials_email, send_email, send_tempor
 from utils.notifications import create_assignment_notification, create_fee_notification
 
 from utils.notification_engine import notify_quiz_created, notify_exam_scheduled, notify_fee_assigned
+from utils.academic_year import configured_academic_year
 
 import uuid, secrets
 
@@ -1504,7 +1505,7 @@ def register_continuing_student():
 
         study_format = request.form.get('study_format', 'Regular').strip()
 
-        academic_year = request.form.get('academic_year', '').strip()
+        academic_year = configured_academic_year()
 
         semester = request.form.get('semester', '').strip()
 
@@ -2342,7 +2343,7 @@ def register_user():
                 current_programme=programme,
                 programme_level=programme_level,
                 study_format=request.form.get('study_format', 'Regular').strip(),
-                academic_year=request.form.get('academic_year', '').strip(),
+                academic_year=configured_academic_year(),
                 semester=request.form.get('semester', '').strip(),
                 index_number=request.form.get('index_number', '').strip() or None,
                 admission_date=datetime.now().date()
@@ -5861,7 +5862,7 @@ def api_get_promotion_candidates():
 
     
 
-    academic_year = request.form.get('academic_year')
+    academic_year = configured_academic_year()
 
     if not academic_year:
 
@@ -7432,7 +7433,10 @@ def assign_fees():
     CLASS_LEVELS = ['100', '200', '300', '400']  # Fixed format
 
     # Get current percentage settings
-    current_year = str(datetime.now().year)
+    current_year = configured_academic_year()
+    if not current_year:
+        flash("Configure the academic year dates before creating fees.", "warning")
+        return redirect(url_for('admin.manage_events'))
     current_settings = FeePercentageSettings.get_active_settings(current_year)
 
 
@@ -7441,7 +7445,7 @@ def assign_fees():
 
         # Handle percentage settings form
         if 'base_payment_percentage' in request.form:
-            academic_year = request.form.get('academic_year')
+            academic_year = current_year
             base_percentage = float(request.form.get('base_payment_percentage'))
             deadline_str = request.form.get('base_payment_deadline')
             allow_installments = 'allow_installments_after_base' in request.form
@@ -7498,7 +7502,7 @@ def assign_fees():
 
 
 
-        if not programme_name or not programme_level or not academic_year_id or not semester:
+        if not programme_name or not programme_level or not semester:
 
             flash("Missing required fields.", "danger")
 
@@ -7508,9 +7512,7 @@ def assign_fees():
 
         # Format as single year only
 
-        academic_year_obj = AcademicYear.query.get(academic_year_id)
-
-        academic_year_str = str(academic_year_obj.start_date.year) if academic_year_obj else str(datetime.now().year)
+        academic_year_str = current_year
 
 
 
@@ -7910,7 +7912,7 @@ def edit_fee_group(group_id):
     CLASS_LEVELS = ['100 Level', '200 Level', '300 Level', '400 Level']
     
     # Get percentage settings for the fee group's academic year
-    group_academic_year = group.academic_year if group else str(datetime.now().year)
+    group_academic_year = configured_academic_year() or group.academic_year
     print(f"DEBUG: Fee group academic_year: {group_academic_year}")
     current_settings = FeePercentageSettings.get_active_settings(group_academic_year)
     print(f"DEBUG: Retrieved current_settings: {current_settings}")
@@ -7923,7 +7925,7 @@ def edit_fee_group(group_id):
         
         # Handle percentage settings form
         if request.form.get('save_percentage_settings'):
-            academic_year = request.form.get('academic_year')
+            academic_year = configured_academic_year()
             base_percentage = float(request.form.get('base_payment_percentage'))
             deadline_str = request.form.get('base_payment_deadline')
             allow_installments = 'allow_installments_after_base' in request.form
@@ -7969,8 +7971,7 @@ def edit_fee_group(group_id):
             group.study_format = request.form.get('study_format')
 
             # Keep single year format
-            academic_year_obj = AcademicYear.query.get(request.form.get('academic_year'))
-            group.academic_year = str(academic_year_obj.start_date.year) if academic_year_obj else str(datetime.now().year)
+            group.academic_year = configured_academic_year() or group.academic_year
 
             group.semester = request.form.get('semester')
             group.description = request.form.get('group_title') or group.description
@@ -8539,7 +8540,7 @@ def add_assessment_period():
         abort(403)
 
     if request.method == 'POST':
-        academic_year = request.form.get('academic_year')
+        academic_year = configured_academic_year()
         semester = request.form.get('semester')
         start_date = datetime.strptime(request.form.get('start_date'), "%Y-%m-%d").date()
         end_date = datetime.strptime(request.form.get('end_date'), "%Y-%m-%d").date()
@@ -9033,4 +9034,3 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('select_portal'))
-
