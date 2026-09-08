@@ -1160,6 +1160,14 @@
 
       </a>
 
+      <a href="{{ url_for('admin.manage_users') }}" class="{% if request.endpoint in ['admin.manage_users', 'admin.edit_user'] %}active{% endif %}">
+
+        <i class="fas fa-user-edit"></i>
+
+        <span class="link-text">Manage Users</span>
+
+      </a>
+
 
 
       <a href="{{ url_for('admin.teacher_assessment_admin_home') }}" class="{% if request.endpoint.startswith('admin.teacher_assessment') %}active{% endif %}">
