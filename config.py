@@ -13,11 +13,26 @@ class Config:
     PAYSTACK_LIVE_SECRET_KEY = os.environ.get("PAYSTACK_LIVE_SECRET_KEY", "")
     PAYSTACK_LIVE_PUBLIC_KEY = os.environ.get("PAYSTACK_LIVE_PUBLIC_KEY", "")
     PAYSTACK_CURRENCY = os.environ.get("PAYSTACK_CURRENCY", "GHS")
-    PAYSTACK_TEST_CALLBACK_URL = os.environ.get("PAYSTACK_TEST_CALLBACK_URL", "")
-    PAYSTACK_LIVE_CALLBACK_URL = os.environ.get("PAYSTACK_LIVE_CALLBACK_URL", "")
-    PAYSTACK_CALLBACK_URL = os.environ.get("PAYSTACK_CALLBACK_URL", "")
-    PAYSTACK_TEST_WEBHOOK_URL = os.environ.get("PAYSTACK_TEST_WEBHOOK_URL", "")
-    PAYSTACK_LIVE_WEBHOOK_URL = os.environ.get("PAYSTACK_LIVE_WEBHOOK_URL", "")
+    PAYSTACK_TEST_CALLBACK_URL = os.environ.get(
+        "PAYSTACK_TEST_CALLBACK_URL",
+        "https://vtiu-lms-production.up.railway.app/student/paystack/callback"
+    )
+    PAYSTACK_LIVE_CALLBACK_URL = os.environ.get(
+        "PAYSTACK_LIVE_CALLBACK_URL",
+        "https://vtiu-lms-production.up.railway.app/student/paystack/callback"
+    )
+    PAYSTACK_CALLBACK_URL = os.environ.get(
+        "PAYSTACK_CALLBACK_URL",
+        "https://vtiu-lms-production.up.railway.app/student/paystack/callback"
+    )
+    PAYSTACK_TEST_WEBHOOK_URL = os.environ.get(
+        "PAYSTACK_TEST_WEBHOOK_URL",
+        "https://vtiu-lms-production.up.railway.app/api/paystack/webhook"
+    )
+    PAYSTACK_LIVE_WEBHOOK_URL = os.environ.get(
+        "PAYSTACK_LIVE_WEBHOOK_URL",
+        "https://vtiu-lms-production.up.railway.app/api/paystack/webhook"
+    )
 
     # DATABASE (Railway PostgreSQL)
     db_url = os.environ.get("DATABASE_URL")
