@@ -1887,6 +1887,7 @@ class ProgrammeFeeStructure(db.Model):
     description = db.Column(db.String(255), nullable=False, default='Default')
 
     amount = db.Column(db.Float, nullable=False, default=0.0)
+    paystack_mode = db.Column(db.String(10), nullable=False, default='test')
 
 
 
@@ -1967,6 +1968,9 @@ class StudentFeeTransaction(db.Model):
     is_approved = db.Column(db.Boolean, default=False)
 
     reviewed_by_admin_id = db.Column(db.Integer, db.ForeignKey('admin.id'))
+    payment_method = db.Column(db.String(30), nullable=True)
+    paystack_mode = db.Column(db.String(10), nullable=True)
+    paystack_reference = db.Column(db.String(100), unique=True, nullable=True)
 
 
 
@@ -3906,4 +3910,4 @@ class StudentPromotion(db.Model):
 
         }
 
-
+    
