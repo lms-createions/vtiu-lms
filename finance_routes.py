@@ -13,6 +13,7 @@ from admissions.forms import CERTIFICATE_PROGRAMMES, DIPLOMA_PROGRAMMES, STUDY_F
 import logging
 import json
 from werkzeug.security import generate_password_hash
+from utils.academic_year import configured_academic_year
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +228,10 @@ def assign_fees():
             flash("Missing required fields.", "danger")
             return redirect(url_for('finance.assign_fees'))
 
-        academic_year_obj = AcademicYear.query.get(academic_year_id)
-        academic_year_str = str(academic_year_obj.start_date.year) if academic_year_obj else str(datetime.now().year)
+        academic_year_str = configured_academic_year()
+        if not academic_year_str:
+            flash("Configure the academic year dates before creating fees.", "warning")
+            return redirect(url_for('finance.assign_fees'))
 
         descriptions = request.form.getlist('description[]')
         amounts = request.form.getlist('amount[]')
@@ -1167,4 +1170,3 @@ def get_department_breakdown():
 # In your main app.py, add:
 # from finance_routes import finance_bp
 # app.register_blueprint(finance_bp, url_prefix='/admin/finance')
-
