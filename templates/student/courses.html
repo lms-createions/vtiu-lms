@@ -22,8 +22,9 @@
           {{ form.semester(class="form-select form-select-sm") }}
         </div>
         <div class="col-md-4">
-          {{ form.academic_year.label(class="form-label small fw-semibold text-muted") }}
-          {{ form.academic_year(class="form-select form-select-sm") }}
+          <label class="form-label small fw-semibold text-muted">Academic Year</label>
+          <input class="form-control form-control-sm" value="{{ current_academic_year or 'Not configured' }}" readonly>
+          <input type="hidden" name="academic_year" value="{{ current_academic_year or '' }}">
         </div>
       </div>
 
