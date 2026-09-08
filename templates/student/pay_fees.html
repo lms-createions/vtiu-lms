@@ -10,16 +10,7 @@
       <form method="get" class="row g-3" id="filtersForm" novalidate>
         <div class="col-md-4">
           <label for="year" class="form-label">Academic Year</label>
-          <select id="year" name="year" class="form-select" required>
-  <option value="">-- Select Academic Year --</option>
-  {% if available_years %}
-    {% for y in available_years %}
-      <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
-    {% endfor %}
-  {% else %}
-    <option value="{{ year }}" selected>{{ year }}</option>
-  {% endif %}
-</select>
+          <input id="year" class="form-control" value="{{ year or 'Not configured' }}" readonly>
 
         </div>
 
@@ -164,7 +155,7 @@
             <div class="card-body">
               <form id="paymentForm" method="post" enctype="multipart/form-data" action="{{ url_for('student.pay_fees') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="year" id="yearHidden" value="{{ year or '' }}">
+                  <input type="hidden" name="year" id="yearHidden" value="{{ year or '' }}">
                 <input type="hidden" name="semester" id="semesterHidden" value="{{ semester or '' }}">
                 <input type="hidden" id="remainingValue" value="{{ "%.2f"|format(remaining if remaining>0 else 0) }}">
                 <input type="hidden" id="allowInstallments" value="{{ '1' if allow_installments else '0' }}">
@@ -460,4 +451,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 {% endblock %}
-
