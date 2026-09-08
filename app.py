@@ -2,6 +2,9 @@
 
 import os
 import logging
+import hashlib
+import hmac
+import json
 from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, flash, request, abort, jsonify, send_from_directory, current_app, g
 from werkzeug.utils import secure_filename
@@ -29,6 +32,47 @@ migrate = Migrate(app, db)
 mail.init_app(app)
 socketio.init_app(app, cors_allowed_origins="*", async_mode='threading')
 csrf = CSRFProtect(app)
+
+
+@app.route('/api/paystack/webhook', methods=['POST'])
+@csrf.exempt
+def paystack_webhook():
+    """Process Paystack charge.success events for test or live transactions."""
+    payload = request.get_json(silent=True) or {}
+    data = payload.get('data') or {}
+    reference = data.get('reference')
+    if not reference:
+        return jsonify({'status': True}), 200
+
+    from models import StudentFeeTransaction
+    transaction = StudentFeeTransaction.query.filter_by(
+        paystack_reference=reference, payment_method='paystack'
+    ).first()
+    if not transaction:
+        return jsonify({'status': True}), 200
+
+    mode = transaction.paystack_mode if transaction.paystack_mode in {'test', 'live'} else 'test'
+    secret_key = app.config.get(f'PAYSTACK_{mode.upper()}_SECRET_KEY')
+    signature = request.headers.get('x-paystack-signature', '')
+    expected_signature = hmac.new(
+        secret_key.encode('utf-8'), request.get_data(), hashlib.sha512
+    ).hexdigest() if secret_key else ''
+    if not signature or not hmac.compare_digest(signature, expected_signature):
+        app.logger.warning('Rejected Paystack webhook for reference %s', reference)
+        return jsonify({'status': False, 'message': 'Invalid signature'}), 401
+
+    currency = app.config.get('PAYSTACK_CURRENCY', 'GHS')
+    valid = (
+        payload.get('event') == 'charge.success'
+        and data.get('status') == 'success'
+        and int(data.get('amount', 0)) == int(round(transaction.amount * 100))
+        and data.get('currency') == currency
+    )
+    if valid and not transaction.is_approved:
+        transaction.is_approved = True
+        transaction.timestamp = datetime.utcnow()
+        db.session.commit()
+    return jsonify({'status': True}), 200
 
 # ===== Logging =====
 logging.basicConfig(level=logging.INFO)
@@ -248,9 +292,20 @@ def initialize_database():
         )
         logger.info("✅ All models imported successfully")
 
+        # Create all tables using db.create_all() - this is safest method
+        logger.info("🔨 Creating all database tables...")
+        from sqlalchemy import inspect, text
+        try:
+            db.create_all()
+            logger.info("✅ db.create_all() completed successfully")
+        except Exception as e:
+            if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
+                logger.info("✅ Some tables/indexes already exist - continuing...")
+            else:
+                logger.warning(f"⚠️ db.create_all() warning: {e}")
+
         # Keep existing PostgreSQL databases compatible with newly added model
         # columns. db.create_all() does not alter existing tables.
-        from sqlalchemy import inspect, text
         inspector = inspect(db.engine)
         admin_columns = {column["name"] for column in inspector.get_columns("admin")}
         if "notes" not in admin_columns:
@@ -275,17 +330,34 @@ def initialize_database():
                 connection.execute(text(
                     "ALTER TABLE student_profile ADD COLUMN rejection_reason TEXT"
                 ))
-        
-        # Create all tables using db.create_all() - this is safest method
-        logger.info("🔨 Creating all database tables...")
-        try:
-            db.create_all()
-            logger.info("✅ db.create_all() completed successfully")
-        except Exception as e:
-            if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-                logger.info("✅ Some tables/indexes already exist - continuing...")
-            else:
-                logger.warning(f"⚠️ db.create_all() warning: {e}")
+
+        fee_structure_columns = {
+            column["name"]
+            for column in inspector.get_columns("programme_fee_structure")
+        }
+        transaction_columns = {
+            column["name"]
+            for column in inspector.get_columns("student_fee_transaction")
+        }
+        with db.engine.begin() as connection:
+            if "paystack_mode" not in fee_structure_columns:
+                connection.execute(text(
+                    "ALTER TABLE programme_fee_structure "
+                    "ADD COLUMN paystack_mode VARCHAR(10) NOT NULL DEFAULT 'test'"
+                ))
+            if "payment_method" not in transaction_columns:
+                connection.execute(text(
+                    "ALTER TABLE student_fee_transaction ADD COLUMN payment_method VARCHAR(30)"
+                ))
+            if "paystack_mode" not in transaction_columns:
+                connection.execute(text(
+                    "ALTER TABLE student_fee_transaction ADD COLUMN paystack_mode VARCHAR(10)"
+                ))
+            if "paystack_reference" not in transaction_columns:
+                connection.execute(text(
+                    "ALTER TABLE student_fee_transaction "
+                    "ADD COLUMN paystack_reference VARCHAR(100) UNIQUE"
+                ))
 
         # Repair partially initialized databases. A failed create_all() can
         # leave later model tables absent even though their models are loaded.
@@ -853,4 +925,3 @@ if __name__ == "__main__":
         debug=not IS_PRODUCTION,
         allow_unsafe_werkzeug=not IS_PRODUCTION
     )
-
