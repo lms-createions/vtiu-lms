@@ -2,6 +2,7 @@
 
 import os
 import logging
+import re
 import hashlib
 import hmac
 import json
@@ -21,10 +22,16 @@ from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 from utils.extensions import db, mail, socketio
 from config import Config
+from utils.academic_year import configured_academic_year
 
 # ===== Flask App =====
 app = Flask(__name__)
 app.config.from_object(Config)
+
+
+@app.context_processor
+def inject_configured_academic_year():
+    return {'current_academic_year': configured_academic_year()}
 
 # Initialize extensions ONCE
 db.init_app(app)
@@ -303,6 +310,31 @@ def initialize_database():
                 logger.info("✅ Some tables/indexes already exist - continuing...")
             else:
                 logger.warning(f"⚠️ db.create_all() warning: {e}")
+
+        # Normalize legacy values such as 2026/2027 to the single-year format.
+        for table in db.metadata.sorted_tables:
+            year_column = table.c.get('academic_year')
+            primary_key = list(table.primary_key.columns)
+            if year_column is None or len(primary_key) != 1:
+                continue
+            try:
+                rows = db.session.execute(
+                    db.select(table.c[primary_key[0].name], year_column)
+                ).all()
+                for row in rows:
+                    value = row[1]
+                    match = re.match(r'^\s*(\d{4})', str(value or ''))
+                    normalized = match.group(1) if match else value
+                    if normalized != value and normalized:
+                        db.session.execute(
+                            table.update().where(
+                                table.c[primary_key[0].name] == row[0]
+                            ).values(academic_year=normalized)
+                        )
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                logger.warning("Could not normalize academic years in %s: %s", table.name, exc)
 
         # Keep existing PostgreSQL databases compatible with newly added model
         # columns. db.create_all() does not alter existing tables.
