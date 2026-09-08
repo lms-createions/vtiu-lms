@@ -51,6 +51,7 @@ from utils.result_builder import ResultBuilder
 from utils.results_manager import ResultManager
 
 from utils.result_templates import get_template_path
+from utils.academic_year import configured_academic_year
 
 
 
@@ -226,19 +227,16 @@ def register_courses():
 
 
 
-    # 2️⃣ LOAD ACADEMIC YEARS
-
-    years = db.session.query(Course.academic_year).distinct().order_by(Course.academic_year).all()
-
-    if not years:
+    # 2️⃣ Use the administrator-configured academic year.
+    configured_year = configured_academic_year()
+    if not configured_year:
 
         flash("No academic years available yet. Contact admin.", "warning")
 
         return redirect(url_for("student.dashboard"))
 
 
-
-    form.academic_year.choices = [(y[0], y[0]) for y in years]
+    form.academic_year.choices = [(configured_year, configured_year)]
 
 
 
@@ -248,7 +246,7 @@ def register_courses():
 
     selected_sem = request.form.get("semester") or form.semester.data or 'First'
 
-    selected_year = request.form.get("academic_year") or form.academic_year.data or years[-1][0]
+    selected_year = configured_year
 
 
 
@@ -1693,7 +1691,10 @@ def pay_fees():
     level = str(int(profile.programme_level)) if profile.programme_level else '100'
     study_format = profile.study_format or 'Regular'
 
-    year = request.args.get('year') or str(datetime.now().year)
+    year = configured_academic_year()
+    if not year:
+        flash("The academic year has not been configured by an administrator.", "warning")
+        return redirect(url_for('main.index'))
     semester = request.args.get('semester') or 'First'
 
     # Get fees
@@ -1816,7 +1817,9 @@ def paystack_initialize():
         abort(403)
 
     payload = request.get_json(silent=True) or request.form
-    year = payload.get('year') or str(datetime.now().year)
+    year = configured_academic_year()
+    if not year:
+        return jsonify({'success': False, 'message': 'Academic year is not configured.'}), 503
     semester = payload.get('semester') or 'First'
     profile = StudentProfile.query.filter_by(user_id=current_user.user_id).first()
     if not profile:
