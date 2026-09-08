@@ -7554,7 +7554,7 @@ def assign_fees():
 
             description=group_title
 
-        )
+        ).first()
 
 
 
