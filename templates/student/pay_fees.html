@@ -200,6 +200,7 @@
                     <label for="method" class="form-label">Payment Method</label>
                     <select id="method" name="method" class="form-select" required>
                       <option value="">-- Select method --</option>
+                      <option value="paystack">Paystack (Online)</option>
                       <option value="mobile_money">Mobile Money</option>
                       <option value="bank_transfer">Bank Transfer</option>
                       <option value="cash">Cash</option>
@@ -322,6 +323,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const amountFeedback = document.getElementById('amountFeedback');
   const proofInput = document.getElementById('proofInput');
   const proofPreview = document.getElementById('proofPreview');
+  const methodSelect = document.getElementById('method');
 
   // Variables from hidden inputs
   const remaining = parseFloat(remainingValueEl.value || '0');
@@ -416,7 +418,41 @@ document.addEventListener('DOMContentLoaded', function () {
   if (form) {
     form.addEventListener('submit', function(e) {
       syncHiddenFilters();
-      if (!validateAmount()) e.preventDefault();
+      if (!validateAmount()) {
+        e.preventDefault();
+        return;
+      }
+
+      if (methodSelect && methodSelect.value === 'paystack') {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Connecting to Paystack...';
+        fetch('{{ url_for("student.paystack_initialize") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+          },
+          body: JSON.stringify({
+            amount: amountInput.value,
+            year: yearHidden.value,
+            semester: semesterHidden.value,
+            description: document.getElementById('descriptionInput').value
+          })
+        })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(result => {
+          if (!result.ok || !result.data.success) {
+            throw new Error(result.data.message || 'Paystack initialization failed.');
+          }
+          window.location.href = result.data.authorization_url;
+        })
+        .catch(error => {
+          alert(error.message);
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Submit Payment';
+        });
+      }
     });
   }
 
@@ -424,3 +460,4 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 {% endblock %}
+
