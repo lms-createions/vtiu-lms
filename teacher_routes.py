@@ -18,6 +18,7 @@ from utils.notifications import create_assignment_notification
 from utils.notification_engine import notify_quiz_created, notify_assignment_created, notify_assignment_graded
 import os, uuid
 from utils.helpers import get_programme_choices, get_level_choices, get_course_choices
+from utils.academic_year import configured_academic_year
 from wtforms.validators import DataRequired 
 from services.semester_grading_service import SemesterGradingService
 import logging
@@ -177,7 +178,7 @@ def assessment_scheme(course_id):
     # Determine current academic year from SchoolSettings
     from models import SchoolSettings
     settings = SchoolSettings.query.first()
-    academic_year = str(settings.current_academic_year) if settings else str(date.today().year)
+    academic_year = configured_academic_year()
 
     # Fetch or create scheme
     scheme = CourseAssessmentScheme.query.filter_by(course_id=course_id, teacher_id=profile.id).first()
@@ -1956,7 +1957,7 @@ def submit_for_vetting():
         return redirect(url_for('teacher.view_results_combined'))
 
     # Get parameters from form
-    academic_year = request.form.get('academic_year', '').strip()
+    academic_year = configured_academic_year()
     semester = request.form.get('semester', '').strip()
 
     if not academic_year or not semester:
