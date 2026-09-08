@@ -155,8 +155,9 @@
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label for="academic_year" class="form-label">Academic Year</label>
-                                    <input type="text" class="form-control" id="academic_year" name="academic_year" 
-                                           placeholder="e.g., 2025" value="{{ current_academic_year or '' }}" required>
+                                     <input type="text" class="form-control" id="academic_year_display"
+                                         value="{{ current_academic_year or 'Not configured' }}" readonly>
+                                     <input type="hidden" id="academic_year" name="academic_year" value="{{ current_academic_year or '' }}">
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="semester" class="form-label">Semester</label>
