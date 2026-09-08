@@ -7481,7 +7481,7 @@ def assign_fees():
         # Handle regular fee assignment form
         programme_name = request.form.get('programme_name')
 
-        programme_level = request.form.get('class_level')  # ✅ rename
+        programme_level = request.form.get('programme_level') or request.form.get('class_level')
 
         study_format = request.form.get('study_format') or 'Regular'
 
@@ -7490,6 +7490,11 @@ def assign_fees():
         semester = request.form.get('semester')
 
         group_title = request.form.get('group_title') or 'Default'
+        paystack_mode = request.form.get('paystack_mode', 'test').strip().lower()
+
+        if paystack_mode not in {'test', 'live'}:
+            flash("Invalid Paystack mode.", "danger")
+            return redirect(url_for('admin.assign_fees'))
 
 
 
@@ -7549,7 +7554,7 @@ def assign_fees():
 
             description=group_title
 
-        ).first()
+        )
 
 
 
@@ -7585,7 +7590,9 @@ def assign_fees():
 
             amount=round(total, 2),
 
-            items=json.dumps(items)
+            items=json.dumps(items),
+
+            paystack_mode=paystack_mode
 
         )
 
