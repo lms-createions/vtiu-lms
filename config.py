@@ -7,6 +7,18 @@ class Config:
     # ------------------------------------------------------
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
+    # Paystack credentials are supplied through deployment environment variables.
+    PAYSTACK_TEST_SECRET_KEY = os.environ.get("PAYSTACK_TEST_SECRET_KEY", "")
+    PAYSTACK_TEST_PUBLIC_KEY = os.environ.get("PAYSTACK_TEST_PUBLIC_KEY", "")
+    PAYSTACK_LIVE_SECRET_KEY = os.environ.get("PAYSTACK_LIVE_SECRET_KEY", "")
+    PAYSTACK_LIVE_PUBLIC_KEY = os.environ.get("PAYSTACK_LIVE_PUBLIC_KEY", "")
+    PAYSTACK_CURRENCY = os.environ.get("PAYSTACK_CURRENCY", "GHS")
+    PAYSTACK_TEST_CALLBACK_URL = os.environ.get("PAYSTACK_TEST_CALLBACK_URL", "")
+    PAYSTACK_LIVE_CALLBACK_URL = os.environ.get("PAYSTACK_LIVE_CALLBACK_URL", "")
+    PAYSTACK_CALLBACK_URL = os.environ.get("PAYSTACK_CALLBACK_URL", "")
+    PAYSTACK_TEST_WEBHOOK_URL = os.environ.get("PAYSTACK_TEST_WEBHOOK_URL", "")
+    PAYSTACK_LIVE_WEBHOOK_URL = os.environ.get("PAYSTACK_LIVE_WEBHOOK_URL", "")
+
     # DATABASE (Railway PostgreSQL)
     db_url = os.environ.get("DATABASE_URL")
 
