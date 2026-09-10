@@ -391,6 +391,30 @@ def initialize_database():
                     "ADD COLUMN paystack_reference VARCHAR(100) UNIQUE"
                 ))
 
+        # Older deployments may have the notification tables but not the
+        # columns added to the current Notification model. db.create_all()
+        # does not alter existing tables, so repair those columns explicitly.
+        notification_columns = {
+            column["name"]
+            for column in inspector.get_columns("notifications")
+        }
+        with db.engine.begin() as connection:
+            if "created_at" not in notification_columns:
+                connection.execute(text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                ))
+            if "priority" not in notification_columns:
+                connection.execute(text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN priority VARCHAR(20) DEFAULT 'normal'"
+                ))
+            if "is_archived" not in notification_columns:
+                connection.execute(text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN is_archived BOOLEAN DEFAULT FALSE"
+                ))
+
         # Repair partially initialized databases. A failed create_all() can
         # leave later model tables absent even though their models are loaded.
         logger.info("🔍 Checking every imported model table...")
