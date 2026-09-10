@@ -1,41 +1,174 @@
 {% extends "student/base_student.html" %}
+{% block title %}Notifications{% endblock %}
+
 {% block content %}
+<div class="container py-4">
 
-<div class="container py-5">
-    <h2 class="text-center fw-bold mb-5">Academic Transcript</h2>
+  <!-- Header Section -->
+  <div class="text-center mb-5">
+    <h2 class="fw-bold text-gradient mb-2">🔔 My Notifications</h2>
+    <p class="text-muted">Stay up to date — your notifications are organized by category below.</p>
+    <hr class="mx-auto" style="width:120px; border-top:2px solid #c77dff;">
+  </div>
 
-    {% for (year, semester), courses in transcript.items() %}
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{{ year }} – {{ semester }}</h5>
-            <span class="badge bg-light text-dark">{{ courses|length }} Courses</span>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover table-striped mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Course</th>
-                        <th>Score</th>
-                        <th>Grade</th>
-                        <th>Credit Hours</th>
-                        <th>Points</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in courses %}
-                    <tr>
-                        <td class="fw-semibold">{{ c.course_name }}</td>
-                        <td>{{ c.score }}</td>
-                        <td class="fw-bold text-success">{{ c.grade }}</td>
-                        <td>{{ c.credit_hours }}</td>
-                        <td>{{ c.grade_point }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <!-- Notification Groups -->
+  {% if grouped_notifications %}
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+      <div class="list-group list-group-flush">
+        {% for title, items in grouped_notifications %}
+          {% set unread_count = items | selectattr("is_read", "equalto", False) | list | length %}
+          {% set latest = items[0].notification %}
+          
+          <div class="list-group-item py-3 px-4 d-flex justify-content-between align-items-center group-hover">
+            
+            <!-- Left Section (Clickable area) -->
+            <a href="{{ url_for('student.view_notification_group', title=title) }}" 
+               class="text-decoration-none text-dark flex-grow-1">
+              <div class="fw-semibold mb-1">{{ title }}</div>
+              <div class="small text-muted">
+                {{ latest.created_at.strftime('%d %b %Y, %I:%M %p') }}
+                &middot;
+                {{ (latest.message or 'No message')[:80] ~ ('...' if (latest.message or '')|length > 80 else '') }}
+              </div>
+            </a>
+
+            <!-- Right Section -->
+            <div class="text-end ms-3 d-flex align-items-center gap-2">
+              {% if unread_count > 0 %}
+                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill shadow-sm">{{ unread_count }} new</span>
+              {% else %}
+                <span class="badge bg-success px-3 py-2 rounded-pill">All read</span>
+              {% endif %}
+              <!-- Delete Group Button -->
+              <button class="btn btn-sm btn-outline-danger delete-group-btn" 
+                      data-title="{{ title }}" title="Delete all in this group">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
     </div>
-    {% endfor %}
+  {% else %}
+    <!-- Empty State with Animated Font Awesome Icon -->
+<div class="text-center mt-5">
+  <div class="empty-animation mx-auto mb-4">
+    <i class="fa fa-bell-slash fa-5x text-secondary empty-icon"></i>
+  </div>
+  <h5 class="fw-semibold text-secondary mb-2">You're all caught up!</h5>
+  <p class="text-muted small mb-0">No notifications at the moment.</p>
+  <p class="text-muted small">Check back later for updates or new alerts.</p>
 </div>
 
+  {% endif %}
+
+  <!-- Back Button -->
+  <div class="text-center mt-5">
+    <a href="{{ url_for('student.dashboard') }}" class="btn btn-outline-dark rounded-pill px-4 py-2 shadow-sm hover-lift">
+      ⬅ Back to Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- JS for Deletion -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.delete-group-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const title = this.dataset.title;
+
+      if (confirm(`Are you sure you want to delete all notifications in "${title}"?`)) {
+        fetch(`/student/notifications/delete_group/${encodeURIComponent(title)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+          }
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            // Smooth fade-out animation
+            const groupItem = this.closest('.list-group-item');
+            groupItem.style.transition = 'opacity 0.3s ease';
+            groupItem.style.opacity = '0';
+            setTimeout(() => window.location.reload(), 350);
+          } else {
+            alert('Failed to delete notifications. Please try again.');
+          }
+        })
+        .catch(() => alert('Error while deleting. Please try again.'));
+      }
+    });
+  });
+});
+</script>
+
+<!-- Styling -->
+<style>
+.text-gradient {
+  background: linear-gradient(45deg, #7b2cbf, #5a189a);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.group-hover {
+  transition: all 0.25s ease;
+}
+.group-hover:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
+}
+
+.empty-illustration {
+  width: 220px;
+  opacity: 0.85;
+  transition: transform 0.4s ease, opacity 0.3s ease;
+}
+.empty-illustration:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.hover-lift {
+  transition: all 0.3s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  background-color: #000;
+  color: #fff;
+}
+
+.empty-animation {
+  animation: float 2.5s ease-in-out infinite;
+}
+
+.empty-icon {
+  opacity: 0.85;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  animation: bellPulse 2.5s infinite ease-in-out;
+}
+
+.empty-icon:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  color: #7b2cbf !important;
+}
+
+/* Floating motion */
+@keyframes float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+/* Soft pulse glow around the bell */
+@keyframes bellPulse {
+  0%, 100% { text-shadow: 0 0 8px rgba(123, 44, 191, 0.4); }
+  50% { text-shadow: 0 0 16px rgba(123, 44, 191, 0.8); }
+}
+
+</style>
 {% endblock %}
