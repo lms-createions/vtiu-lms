@@ -100,7 +100,7 @@
   <div class="glass-card p-4 mb-4">
     <div class="section-title"><i class="bi bi-person"></i> Personal Information</div>
     <div class="info-grid">
-      <div class="info-item"><strong>Date of Birth</strong>{{ profile.dob.strftime('%B %d, %Y') if profile.dob else 'N/A' }}</div>
+      <div class="info-item"><strong>Date of Birth</strong>{{ dob_display }}</div>
       <div class="info-item"><strong>Gender</strong>{{ profile.gender or 'N/A' }}</div>
       <div class="info-item"><strong>Nationality</strong>{{ profile.nationality or 'N/A' }}</div>
       <div class="info-item"><strong>Religion</strong>{{ profile.religion or 'N/A' }}</div>
@@ -117,7 +117,7 @@
       <div class="info-item"><strong>Academic Year</strong>{{ profile.academic_year or 'N/A' }}</div>
       <div class="info-item"><strong>Semester</strong>{{ profile.semester or 'N/A' }}</div>
       <div class="info-item"><strong>Status</strong>{{ profile.academic_status or 'Active' }}</div>
-      <div class="info-item"><strong>Admission Date</strong>{{ profile.admission_date.strftime('%B %d, %Y') if profile.admission_date else 'N/A' }}</div>
+      <div class="info-item"><strong>Admission Date</strong>{{ admission_date_display }}</div>
     </div>
   </div>
 
