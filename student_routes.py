@@ -2018,7 +2018,25 @@ def profile():
 
     profile = StudentProfile.query.filter_by(user_id=current_user.user_id).first()
 
-    return render_template('student/profile.html', profile=profile, user=current_user)
+    def format_profile_date(value):
+        if not value:
+            return 'N/A'
+        if isinstance(value, str):
+            try:
+                value = datetime.fromisoformat(value)
+            except ValueError:
+                return value
+        return value.strftime('%B %d, %Y')
+
+    return render_template(
+        'student/profile.html',
+        profile=profile,
+        user=current_user,
+        dob_display=format_profile_date(profile.dob) if profile else 'N/A',
+        admission_date_display=(
+            format_profile_date(profile.admission_date) if profile else 'N/A'
+        ),
+    )
 
 
 
