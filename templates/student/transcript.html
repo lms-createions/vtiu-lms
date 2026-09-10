@@ -24,11 +24,11 @@
                 <tbody>
                     {% for c in courses %}
                     <tr>
-                        <td class="fw-semibold">{{ c.course.name }}</td>
+                        <td class="fw-semibold">{{ c.course_name }}</td>
                         <td>{{ c.score }}</td>
                         <td class="fw-bold text-success">{{ c.grade }}</td>
-                        <td>{{ c.course.credit_hours }}</td>
-                        <td>{{ c.points }}</td>
+                        <td>{{ c.credit_hours }}</td>
+                        <td>{{ c.grade_point }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
