@@ -5,8 +5,59 @@ import qrcode
 import base64
 from flask import current_app, url_for
 from utils.image_generator import generate_image_from_html
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 
 from models import StudentProfile
+
+
+def _generate_fallback_pdf(student, file_path, profile_pic_path, logo_path,
+                           index_number, programme_name, date_issue, date_expiry,
+                           qr_base64):
+    card_width, card_height = 85.6 * mm, 53.98 * mm
+    pdf = canvas.Canvas(file_path, pagesize=(card_width, card_height))
+
+    pdf.setFillColor(colors.HexColor('#12355b'))
+    pdf.rect(0, 0, card_width, card_height, fill=1, stroke=0)
+    if os.path.exists(logo_path):
+        pdf.drawImage(logo_path, 5 * mm, card_height - 17 * mm, width=15 * mm,
+                      height=12 * mm, preserveAspectRatio=True, mask='auto')
+    if os.path.exists(profile_pic_path):
+        pdf.drawImage(profile_pic_path, 7 * mm, 16 * mm, width=25 * mm,
+                      height=25 * mm, preserveAspectRatio=True, mask='auto')
+
+    pdf.setFillColor(colors.white)
+    pdf.setFont('Helvetica-Bold', 9)
+    pdf.drawString(24 * mm, card_height - 9 * mm, 'VTIU COLLEGE')
+    pdf.setFont('Helvetica-Bold', 8)
+    pdf.drawString(36 * mm, 34 * mm, str(getattr(student, 'full_name', 'Student'))[:30])
+    pdf.setFont('Helvetica', 6.5)
+    pdf.drawString(36 * mm, 29 * mm, f'INDEX: {index_number}')
+    pdf.drawString(36 * mm, 25 * mm, str(programme_name)[:32])
+    pdf.drawString(36 * mm, 21 * mm, f'ISSUED: {date_issue}  EXPIRES: {date_expiry}')
+    pdf.setFont('Helvetica-Bold', 6)
+    pdf.drawString(7 * mm, 9 * mm, 'STUDENT ID CARD')
+    pdf.showPage()
+
+    pdf.setFillColor(colors.white)
+    pdf.rect(0, 0, card_width, card_height, fill=1, stroke=0)
+    pdf.setFillColor(colors.HexColor('#12355b'))
+    pdf.rect(0, card_height - 12 * mm, card_width, 12 * mm, fill=1, stroke=0)
+    pdf.setFillColor(colors.black)
+    pdf.setFont('Helvetica-Bold', 8)
+    pdf.drawString(7 * mm, card_height - 8 * mm, 'VTIU COLLEGE - STUDENT CARD')
+    pdf.setFont('Helvetica', 6.5)
+    pdf.drawString(7 * mm, card_height - 20 * mm, 'This card remains the property of VTIU College.')
+    pdf.drawString(7 * mm, card_height - 25 * mm, 'Return it to the College if found or when requested.')
+    try:
+        qr_image = ImageReader(io.BytesIO(base64.b64decode(qr_base64.split(',', 1)[1])))
+        pdf.drawImage(qr_image, card_width - 27 * mm, 7 * mm, width=20 * mm,
+                      height=20 * mm, preserveAspectRatio=True, mask='auto')
+    except (ValueError, IndexError):
+        pass
+    pdf.save()
 
 def generate_student_id_card_pdf(student):
     """
@@ -419,9 +470,13 @@ def generate_student_id_card_pdf(student):
         print(f"ID card generated successfully: {filename}")
         print(f"  Profile picture used: {profile_pic_filename}")
     except Exception as e:
-        print(f"Error generating image: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
+        print(f"HTML image generation unavailable, creating PDF fallback: {e}")
+        filename = f"id_card_{student.user_id}.pdf"
+        file_path = os.path.join(upload_dir, filename)
+        _generate_fallback_pdf(
+            student, file_path, profile_pic_path, logo_path, index_number,
+            programme_name, date_issue, date_expiry, qr_base64
+        )
+        return url_for('static', filename=f'uploads/id_cards/{filename}')
 
     return url_for('static', filename=f'uploads/id_cards/{filename}')
