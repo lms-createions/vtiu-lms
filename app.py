@@ -415,6 +415,22 @@ def initialize_database():
                     "ADD COLUMN is_archived BOOLEAN DEFAULT FALSE"
                 ))
 
+        grade_columns = {
+            column["name"]
+            for column in inspector.get_columns("student_course_grade")
+        }
+        with db.engine.begin() as connection:
+            if "grade_point" not in grade_columns:
+                connection.execute(text(
+                    "ALTER TABLE student_course_grade "
+                    "ADD COLUMN grade_point FLOAT"
+                ))
+            if "pass_fail" not in grade_columns:
+                connection.execute(text(
+                    "ALTER TABLE student_course_grade "
+                    "ADD COLUMN pass_fail VARCHAR(10)"
+                ))
+
         # Repair partially initialized databases. A failed create_all() can
         # leave later model tables absent even though their models are loaded.
         logger.info("🔍 Checking every imported model table...")
