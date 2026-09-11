@@ -1,0 +1,121 @@
+{% extends "vclass/base_vclass.html" %}
+{% block title %}{{ meeting.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <div class="text-muted small">{{ meeting.course.name }}</div>
+      <h3 class="mb-0">{{ meeting.title }}</h3>
+    </div>
+    <a href="{{ url_for('teacher.meetings') if agora_role == 'host' else url_for('vclass.student_meetings') }}" class="btn btn-outline-secondary">Leave</a>
+  </div>
+
+  <div id="agora-error" class="alert alert-danger d-none" role="alert"></div>
+  <div class="row g-3">
+    <div class="col-lg-9">
+      <div id="remote-users" class="row g-2"></div>
+      <div id="local-user" class="video-tile d-none">
+        <div class="video-label">You</div>
+      </div>
+    </div>
+    <div class="col-lg-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h6>Class controls</h6>
+          {% if agora_role == 'host' %}
+          <button id="toggle-mic" class="btn btn-success w-100 mb-2">Mute microphone</button>
+          <button id="toggle-camera" class="btn btn-success w-100 mb-2">Turn camera off</button>
+          <button id="share-screen" class="btn btn-outline-primary w-100">Share screen</button>
+          {% else %}
+          <p class="text-muted small mb-0">You are attending as a student. The teacher controls the broadcast.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .video-tile { min-height: 220px; background: #17212b; border-radius: .5rem; position: relative; overflow: hidden; }
+  .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .video-label { position: absolute; z-index: 1; left: .75rem; bottom: .5rem; color: white; background: rgba(0,0,0,.55); padding: .2rem .45rem; border-radius: .25rem; }
+</style>
+
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.24.2.js"></script>
+<script>
+  const agoraConfig = {
+    appId: {{ agora_app_id|tojson }},
+    channel: {{ agora_channel|tojson }},
+    token: {{ agora_token|tojson }},
+    uid: {{ agora_uid|tojson }},
+    role: {{ agora_role|tojson }}
+  };
+  const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+  let localTracks = [];
+
+  function showError(message) {
+    const error = document.getElementById('agora-error');
+    error.textContent = message;
+    error.classList.remove('d-none');
+  }
+
+  function addRemoteUser(user) {
+    const tile = document.createElement('div');
+    tile.id = `remote-${user.uid}`;
+    tile.className = 'col-md-6 video-tile';
+    tile.innerHTML = `<div class="video-label">Teacher</div>`;
+    document.getElementById('remote-users').appendChild(tile);
+    user.videoTrack?.play(tile.id);
+  }
+
+  client.on('user-published', async (user, mediaType) => {
+    await client.subscribe(user, mediaType);
+    if (mediaType === 'video') addRemoteUser(user);
+    if (mediaType === 'audio') user.audioTrack?.play();
+  });
+
+  client.on('user-unpublished', user => {
+    document.getElementById(`remote-${user.uid}`)?.remove();
+  });
+
+  async function startRoom() {
+    try {
+      await client.setClientRole(agoraConfig.role === 'host' ? 'host' : 'audience');
+      await client.join(agoraConfig.appId, agoraConfig.channel, agoraConfig.token, agoraConfig.uid);
+      if (agoraConfig.role !== 'host') return;
+
+      localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+      document.getElementById('local-user').classList.remove('d-none');
+      localTracks[1].play('local-user');
+      await client.publish(localTracks);
+
+      document.getElementById('toggle-mic').onclick = async event => {
+        const enabled = localTracks[0].enabled;
+        await localTracks[0].setEnabled(!enabled);
+        event.target.textContent = enabled ? 'Unmute microphone' : 'Mute microphone';
+      };
+      document.getElementById('toggle-camera').onclick = async event => {
+        const enabled = localTracks[1].enabled;
+        await localTracks[1].setEnabled(!enabled);
+        event.target.textContent = enabled ? 'Turn camera on' : 'Turn camera off';
+      };
+      document.getElementById('share-screen').onclick = async event => {
+        const screenTrack = await AgoraRTC.createScreenVideoTrack();
+        await client.unpublish(localTracks[1]);
+        localTracks[1].close();
+        localTracks[1] = screenTrack;
+        screenTrack.play('local-user');
+        await client.publish(screenTrack);
+        event.target.disabled = true;
+      };
+    } catch (error) {
+      console.error(error);
+      showError('Unable to join this live class. Check your connection and try again.');
+    }
+  }
+
+  window.addEventListener('beforeunload', () => localTracks.forEach(track => track.close()));
+  startRoom();
+</script>
+{% endblock %}
