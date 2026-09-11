@@ -1167,6 +1167,7 @@ def join_meeting(meeting_id):
         meeting_has_whiteboard_field = hasattr(meeting, 'whiteboard_uuid')
         whiteboard_uuid = getattr(meeting, 'whiteboard_uuid', None)
         whiteboard_token = None
+        whiteboard_status = 'ready'
 
         if meeting_has_whiteboard_field and not whiteboard_uuid:
             meeting.whiteboard_uuid = create_whiteboard_room(
@@ -1195,6 +1196,7 @@ def join_meeting(meeting_id):
             current_app.logger.warning(
                 'Meeting model does not include whiteboard_uuid; starting Agora video without Whiteboard.'
             )
+            whiteboard_status = 'migration_pending'
     except RuntimeError as exc:
         current_app.logger.error('Agora configuration error: %s', exc)
         flash(f'Live class service is unavailable: {exc}', 'danger')
@@ -1219,6 +1221,7 @@ def join_meeting(meeting_id):
         whiteboard_region=current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
         whiteboard_uuid=whiteboard_uuid,
         whiteboard_token=whiteboard_token,
+        whiteboard_status=whiteboard_status,
         whiteboard_uid=str(current_user.id),
     )
 
