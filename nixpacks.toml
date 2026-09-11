@@ -1,6 +1,7 @@
 [phases.setup]
 nixPkgs = [
   "python312",
+  "python312Packages.pip",
   "gcc",
   "glib",
   "pango",
@@ -13,9 +14,9 @@ nixPkgs = [
 
 [phases.install]
 cmds = [
-  "pip install -r requirements.txt",
-  "playwright install chromium"
+  "python -m pip install -r requirements.txt",
+  "python -m playwright install chromium"
 ]
 
 [phases.start]
-cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
+cmd = "python -m flask --app app db upgrade && python -m gunicorn app:app --bind 0.0.0.0:$PORT"
