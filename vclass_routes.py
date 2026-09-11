@@ -1161,23 +1161,20 @@ def join_meeting(meeting_id):
     else:
         abort(403)
 
-    if not hasattr(meeting, 'whiteboard_uuid'):
-        current_app.logger.error(
-            'Meeting model is missing whiteboard_uuid; deploy the current models.py '
-            'and run flask db upgrade.'
-        )
-        flash('Live class update is pending deployment. Please try again after the next deploy.', 'danger')
-        return redirect(url_for('teacher.meetings' if role == 'host' else 'vclass.student_meetings'))
-
     try:
         whiteboard_sdk_token = current_app.config.get('WHITEBOARD_SDK_TOKEN')
         whiteboard_region = current_app.config.get('WHITEBOARD_REGION', 'us-sv')
-        if not meeting.whiteboard_uuid:
+        meeting_has_whiteboard_field = hasattr(meeting, 'whiteboard_uuid')
+        whiteboard_uuid = getattr(meeting, 'whiteboard_uuid', None)
+        whiteboard_token = None
+
+        if meeting_has_whiteboard_field and not whiteboard_uuid:
             meeting.whiteboard_uuid = create_whiteboard_room(
                 whiteboard_sdk_token,
                 whiteboard_region,
             )
             db.session.commit()
+            whiteboard_uuid = meeting.whiteboard_uuid
 
         token = build_rtc_token(
             current_app.config.get('AGORA_APP_ID'),
@@ -1187,12 +1184,17 @@ def join_meeting(meeting_id):
             role,
             expires_in=3600,
         )
-        whiteboard_token = build_whiteboard_room_token(
-            whiteboard_sdk_token,
-            meeting.whiteboard_uuid,
-            whiteboard_region,
-            'admin' if role == 'host' else 'writer',
-        )
+        if meeting_has_whiteboard_field and whiteboard_uuid:
+            whiteboard_token = build_whiteboard_room_token(
+                whiteboard_sdk_token,
+                whiteboard_uuid,
+                whiteboard_region,
+                'admin' if role == 'host' else 'writer',
+            )
+        else:
+            current_app.logger.warning(
+                'Meeting model does not include whiteboard_uuid; starting Agora video without Whiteboard.'
+            )
     except RuntimeError as exc:
         current_app.logger.error('Agora configuration error: %s', exc)
         flash(f'Live class service is unavailable: {exc}', 'danger')
@@ -1215,7 +1217,7 @@ def join_meeting(meeting_id):
         agora_role=role,
         whiteboard_app_identifier=current_app.config.get('WHITEBOARD_APP_IDENTIFIER'),
         whiteboard_region=current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
-        whiteboard_uuid=meeting.whiteboard_uuid,
+        whiteboard_uuid=whiteboard_uuid,
         whiteboard_token=whiteboard_token,
         whiteboard_uid=str(current_user.id),
     )
