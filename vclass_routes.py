@@ -1161,6 +1161,14 @@ def join_meeting(meeting_id):
     else:
         abort(403)
 
+    if not hasattr(meeting, 'whiteboard_uuid'):
+        current_app.logger.error(
+            'Meeting model is missing whiteboard_uuid; deploy the current models.py '
+            'and run flask db upgrade.'
+        )
+        flash('Live class update is pending deployment. Please try again after the next deploy.', 'danger')
+        return redirect(url_for('teacher.meetings' if role == 'host' else 'vclass.student_meetings'))
+
     try:
         whiteboard_sdk_token = current_app.config.get('WHITEBOARD_SDK_TOKEN')
         whiteboard_region = current_app.config.get('WHITEBOARD_REGION', 'us-sv')
