@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, abort, flash, redirect, url_for, r
 from flask_login import login_required, current_user, login_user
 import requests
 from wtforms import SelectField
-from models import CourseAssessmentScheme, CourseMaterial, ExamOption, ExamQuestion, ExamSet, ExamSetQuestion, Meeting, Option, Question, SemesterResultRelease, db, TeacherProfile, Course, StudentCourseRegistration, TeacherCourseAssignment, AttendanceRecord, User, StudentProfile, AcademicCalendar, AcademicYear, AppointmentBooking, AppointmentSlot, Assignment, Quiz, StudentQuizSubmission, Exam, ExamSubmission, AssignmentSubmission, GradingScale, ExamTimetableEntry, TeacherAssessment, TeacherAssessmentAnswer, TeacherAssessmentPeriod
+from models import CourseAssessmentScheme, CourseMaterial, ExamOption, ExamQuestion, ExamSet, ExamSetQuestion, Meeting, Option, Question, SemesterResultRelease, db, TeacherProfile, Course, StudentCourseRegistration, TeacherCourseAssignment, AttendanceRecord, User, StudentProfile, AcademicCalendar, AcademicYear, AppointmentBooking, AppointmentSlot, Assignment, Quiz, StudentQuizSubmission, Exam, ExamSubmission, AssignmentSubmission, GradingScale, ExamTimetableEntry, TeacherAssessment, TeacherAssessmentAnswer, TeacherAssessmentPeriod, Conversation
 from forms import AssignmentForm, ChangePasswordForm, ExamForm, ExamQuestionForm, ExamSetForm, MaterialForm, MeetingForm, QuizForm, TeacherLoginForm
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta, date
@@ -21,6 +21,7 @@ from utils.helpers import get_programme_choices, get_level_choices, get_course_c
 from utils.academic_year import configured_academic_year
 from wtforms.validators import DataRequired 
 from services.semester_grading_service import SemesterGradingService
+from utils.agora import create_whiteboard_room
 import logging
 
 
@@ -2146,21 +2147,87 @@ def add_meeting():
 
     if form.validate_on_submit():
         duration = int((form.scheduled_end.data - form.scheduled_start.data).total_seconds() // 60)
-        meeting = Meeting(
-            title=form.title.data,
-            description=form.description.data,
-            host_id=current_user.id,
-            course_id=form.course_id.data,
-            meeting_code=create_agora_channel(),
-            scheduled_start=form.scheduled_start.data,
-            scheduled_end=form.scheduled_end.data,
-        )
-        db.session.add(meeting)
-        db.session.commit()
+        try:
+            whiteboard_uuid = create_whiteboard_room(
+                current_app.config.get('WHITEBOARD_SDK_TOKEN'),
+                current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
+            )
+            meeting = Meeting(
+                title=form.title.data,
+                description=form.description.data,
+                host_id=current_user.id,
+                course_id=form.course_id.data,
+                meeting_code=create_agora_channel(),
+                whiteboard_uuid=whiteboard_uuid,
+                scheduled_start=form.scheduled_start.data,
+                scheduled_end=form.scheduled_end.data,
+            )
+            db.session.add(meeting)
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            current_app.logger.exception('Failed to create Agora classroom: %s', exc)
+            flash('Could not create the live class. Check Agora Whiteboard configuration.', 'danger')
+            return render_template('teacher/meeting_form.html', form=form)
         flash("Agora live class created successfully!", "success")
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
+
+
+@teacher_bp.route('/meetings/<int:meeting_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_meeting(meeting_id):
+    if current_user.role != 'teacher':
+        abort(403)
+
+    meeting = Meeting.query.filter_by(
+        id=meeting_id,
+        host_id=current_user.id,
+    ).first_or_404()
+    profile = TeacherProfile.query.filter_by(user_id=current_user.user_id).first()
+    if not profile:
+        flash('Please complete your profile first.', 'warning')
+        return redirect(url_for('teacher.dashboard'))
+
+    form = MeetingForm(obj=meeting)
+    form.course_id.choices = [(a.course.id, a.course.name) for a in profile.assignments]
+
+    if form.validate_on_submit():
+        if form.scheduled_end.data <= form.scheduled_start.data:
+            form.scheduled_end.errors.append('End time must be after the start time.')
+        else:
+            meeting.title = form.title.data
+            meeting.description = form.description.data
+            meeting.course_id = form.course_id.data
+            meeting.scheduled_start = form.scheduled_start.data
+            meeting.scheduled_end = form.scheduled_end.data
+            db.session.commit()
+            flash('Meeting updated successfully.', 'success')
+            return redirect(url_for('teacher.meetings'))
+
+    return render_template('teacher/meeting_form.html', form=form, meeting=meeting)
+
+
+@teacher_bp.route('/meetings/<int:meeting_id>/delete', methods=['POST'])
+@login_required
+def delete_meeting(meeting_id):
+    if current_user.role != 'teacher':
+        abort(403)
+
+    meeting = Meeting.query.filter_by(
+        id=meeting_id,
+        host_id=current_user.id,
+    ).first_or_404()
+
+    for conversation in Conversation.query.filter_by(type='class').all():
+        if (conversation.get_meta() or {}).get('meeting_id') == meeting.id:
+            db.session.delete(conversation)
+
+    db.session.delete(meeting)
+    db.session.commit()
+    flash('Meeting deleted successfully.', 'success')
+    return redirect(url_for('teacher.meetings'))
 
 
 # Exams Management
