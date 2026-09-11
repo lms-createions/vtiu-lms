@@ -13,16 +13,29 @@
 
   <div id="agora-error" class="alert alert-danger d-none" role="alert"></div>
   <div class="row g-3">
-    <div class="col-lg-9">
+    <div id="video-panel" class="col-lg-9">
       <div id="remote-users" class="row g-2"></div>
       <div id="local-user" class="video-tile d-none">
         <div class="video-label">You</div>
       </div>
     </div>
+    <div id="whiteboard-panel" class="col-lg-9 panel-hidden">
+      <section class="whiteboard-panel" aria-label="Interactive whiteboard">
+        <div class="whiteboard-toolbar">
+          <strong>Interactive whiteboard</strong>
+          <span id="whiteboard-status" class="text-muted small">Connecting...</span>
+        </div>
+        <div id="whiteboard"></div>
+      </section>
+    </div>
     <div class="col-lg-3">
       <div class="card border-0 shadow-sm">
         <div class="card-body">
           <h6>Class controls</h6>
+          <div class="btn-group w-100 mb-3" role="group" aria-label="View mode">
+            <button id="show-video-view" type="button" class="btn btn-primary btn-sm">Show video</button>
+            <button id="show-board-view" type="button" class="btn btn-outline-primary btn-sm">Show board</button>
+          </div>
           {% if agora_role == 'host' %}
           <button id="toggle-mic" class="btn btn-success w-100 mb-2">Mute microphone</button>
           <button id="toggle-camera" class="btn btn-success w-100 mb-2">Turn camera off</button>
@@ -30,6 +43,23 @@
           {% else %}
           <p class="text-muted small mb-0">You are attending as a student. The teacher controls the broadcast.</p>
           {% endif %}
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mt-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0">Class chat</h6>
+            <span class="badge bg-primary-subtle text-primary small">Live</span>
+          </div>
+          <div id="class-chat-messages" class="chat-thread mb-3" aria-live="polite"></div>
+
+          <div class="input-group input-group-sm">
+            <textarea id="class-chat-input" class="form-control" rows="2" placeholder="Ask a question for everyone..."></textarea>
+          </div>
+          <div class="d-grid gap-2 mt-2">
+            <button id="class-chat-send" type="button" class="btn btn-primary btn-sm">Send to class</button>
+          </div>
         </div>
       </div>
     </div>
@@ -40,9 +70,20 @@
   .video-tile { min-height: 220px; background: #17212b; border-radius: .5rem; position: relative; overflow: hidden; }
   .video-tile video { width: 100%; height: 100%; object-fit: cover; }
   .video-label { position: absolute; z-index: 1; left: .75rem; bottom: .5rem; color: white; background: rgba(0,0,0,.55); padding: .2rem .45rem; border-radius: .25rem; }
+  .whiteboard-panel { background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .whiteboard-toolbar { display: flex; justify-content: space-between; padding: .75rem 1rem; border-bottom: 1px solid #dee2e6; }
+  #whiteboard { width: 100%; height: min(62vh, 680px); min-height: 360px; }
+  .panel-hidden { display: none !important; }
+  .chat-thread { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; background: #f8f9fa; border-radius: .5rem; padding: .5rem; }
+  .class-chat-message { background: white; border: 1px solid #e9ecef; border-radius: .5rem; padding: .5rem .6rem; }
+  .class-chat-message strong { display: block; font-size: .75rem; margin-bottom: .15rem; }
+  .class-chat-message small { color: #6c757d; }
 </style>
 
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
 <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.24.2.js"></script>
+<script src="https://sdk.netless.link/white-web-sdk/2.15.16.js"></script>
 <script>
   const agoraConfig = {
     appId: {{ agora_app_id|tojson }},
@@ -51,8 +92,98 @@
     uid: {{ agora_uid|tojson }},
     role: {{ agora_role|tojson }}
   };
+
+  const whiteboardConfig = {
+    appIdentifier: {{ whiteboard_app_identifier|tojson }},
+    region: {{ whiteboard_region|tojson }},
+    uuid: {{ whiteboard_uuid|tojson }},
+    roomToken: {{ whiteboard_token|tojson }},
+    uid: {{ whiteboard_uid|tojson }}
+  };
+  const classChatConfig = {
+    conversationId: {{ class_conversation_id|tojson }},
+    currentUserId: {{ current_user_public_id|tojson }},
+    currentUserName: {{ (current_user.full_name if current_user else 'User')|tojson }}
+  };
   const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+  const videoPanel = document.getElementById('video-panel');
+  const whiteboardPanel = document.getElementById('whiteboard-panel');
+  const showVideoButton = document.getElementById('show-video-view');
+  const showBoardButton = document.getElementById('show-board-view');
+  const classChatMessages = document.getElementById('class-chat-messages');
+  const classChatInput = document.getElementById('class-chat-input');
+  const classChatSend = document.getElementById('class-chat-send');
+  const socket = io();
   let localTracks = [];
+
+  function appendClassChatMessage(message) {
+    const item = document.createElement('div');
+    item.className = 'class-chat-message';
+    item.innerHTML = `
+      <strong>${message.sender_name || 'Class member'}</strong>
+      <div>${(message.content || '').replace(/\n/g, '<br>')}</div>
+      <small>${message.created_at || ''}</small>
+    `;
+    classChatMessages.appendChild(item);
+    classChatMessages.scrollTop = classChatMessages.scrollHeight;
+  }
+
+  function loadClassChatHistory() {
+    if (!classChatConfig.conversationId) return;
+
+    fetch(`/chat/conversations/${classChatConfig.conversationId}/messages`)
+      .then(response => response.ok ? response.json() : [])
+      .then(messages => {
+        classChatMessages.innerHTML = '';
+        (messages || []).forEach(appendClassChatMessage);
+      })
+      .catch(error => console.error('Failed to load class chat history', error));
+  }
+
+  function sendClassChatMessage() {
+    const value = (classChatInput.value || '').trim();
+    if (!value || !classChatConfig.conversationId) return;
+
+    socket.emit('send_message', {
+      conversation_id: classChatConfig.conversationId,
+      message: value
+    });
+
+    classChatInput.value = '';
+  }
+
+  socket.on('connect', () => {
+    socket.emit('join', { user_id: classChatConfig.currentUserId });
+  });
+
+  socket.on('new_message', (data) => {
+    if (data.conversation_id !== classChatConfig.conversationId) return;
+    appendClassChatMessage(data.message);
+  });
+
+  classChatSend.addEventListener('click', sendClassChatMessage);
+  classChatInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendClassChatMessage();
+    }
+  });
+
+  loadClassChatHistory();
+
+  function setViewMode(mode) {
+    const showVideo = mode === 'video';
+    videoPanel.classList.toggle('panel-hidden', !showVideo);
+    whiteboardPanel.classList.toggle('panel-hidden', showVideo);
+
+    showVideoButton.classList.toggle('btn-primary', showVideo);
+    showVideoButton.classList.toggle('btn-outline-primary', !showVideo);
+    showBoardButton.classList.toggle('btn-primary', !showVideo);
+    showBoardButton.classList.toggle('btn-outline-primary', showVideo);
+
+    showVideoButton.classList.toggle('active', showVideo);
+    showBoardButton.classList.toggle('active', !showVideo);
+  }
 
   function showError(message) {
     const error = document.getElementById('agora-error');
@@ -115,7 +246,41 @@
     }
   }
 
+  function startWhiteboard() {
+    const status = document.getElementById('whiteboard-status');
+    if (!whiteboardConfig.appIdentifier || !whiteboardConfig.uuid || !whiteboardConfig.roomToken) {
+      status.textContent = 'Whiteboard is not configured';
+      return;
+    }
+
+    try {
+      const whiteWebSdk = new WhiteWebSdk({
+        appIdentifier: whiteboardConfig.appIdentifier,
+        region: whiteboardConfig.region
+      });
+      whiteWebSdk.joinRoom({
+        uuid: whiteboardConfig.uuid,
+        uid: whiteboardConfig.uid,
+        roomToken: whiteboardConfig.roomToken
+      }).then(room => {
+        room.bindHtmlElement(document.getElementById('whiteboard'));
+        status.textContent = 'Connected';
+      }).catch(error => {
+        console.error(error);
+        status.textContent = 'Unable to connect';
+      });
+    } catch (error) {
+      console.error(error);
+      status.textContent = 'Unable to connect';
+    }
+  }
+
+  showVideoButton.addEventListener('click', () => setViewMode('video'));
+  showBoardButton.addEventListener('click', () => setViewMode('board'));
+  setViewMode('video');
+
   window.addEventListener('beforeunload', () => localTracks.forEach(track => track.close()));
   startRoom();
+  startWhiteboard();
 </script>
 {% endblock %}
