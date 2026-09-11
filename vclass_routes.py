@@ -4,7 +4,7 @@ from flask import request
 from flask_login import login_required, current_user, login_user, logout_user
 from sqlalchemy import func, text, inspect
 from werkzeug.utils import safe_join, secure_filename
-from models import QuizAttempt, db, User, Quiz, StudentQuizSubmission, Question, StudentProfile, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ProgrammeFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Meeting, StudentAnswer, Recording, PasswordResetRequest, PasswordResetToken, AssignmentSubmission
+from models import QuizAttempt, db, User, Quiz, StudentQuizSubmission, Question, StudentProfile, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ProgrammeFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Meeting, StudentAnswer, Recording, PasswordResetRequest, PasswordResetToken, AssignmentSubmission, Conversation, ConversationParticipant
 from datetime import date, datetime, timedelta, time
 from forms import StudentLoginForm, ForgotPasswordForm, ResetPasswordForm
 from io import BytesIO
@@ -16,7 +16,7 @@ from reportlab.platypus import Table, TableStyle
 from utils.email import send_password_reset_email
 from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import generate_csrf
-from utils.agora import build_rtc_token
+from utils.agora import build_rtc_token, build_whiteboard_room_token
 
 vclass_bp = Blueprint('vclass', __name__, url_prefix='/vclass')
 
@@ -25,6 +25,60 @@ UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads", "assignments")
 
 def allowed_file(filename):
     return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def ensure_meeting_class_conversation(meeting):
+    """Ensure a persistent class conversation exists for the meeting and includes all enrolled students."""
+    conv = None
+    for candidate in Conversation.query.filter_by(type='class').all():
+        meta = candidate.get_meta() or {}
+        if meta.get('meeting_id') == meeting.id:
+            conv = candidate
+            break
+
+    if conv is None:
+        host_user = User.query.get(meeting.host_id)
+        conv = Conversation(type='class')
+        conv.set_meta({
+            'name': meeting.title,
+            'created_by': host_user.public_id if host_user else None,
+            'meeting_id': meeting.id,
+            'course_id': meeting.course_id,
+        })
+        db.session.add(conv)
+        db.session.flush()
+
+    def add_participant(user_obj, role='student'):
+        if not user_obj or not getattr(user_obj, 'public_id', None):
+            return
+        existing = ConversationParticipant.query.filter_by(
+            conversation_id=conv.id,
+            user_public_id=user_obj.public_id,
+        ).first()
+        if existing:
+            if role and existing.user_role != role:
+                existing.user_role = role
+            return
+        db.session.add(ConversationParticipant(
+            conversation_id=conv.id,
+            user_public_id=user_obj.public_id,
+            user_role=role,
+            is_group_admin=(role == 'teacher' and user_obj.id == meeting.host_id)
+        ))
+
+    host_user = User.query.get(meeting.host_id)
+    if host_user:
+        add_participant(host_user, 'teacher')
+
+    registrations = StudentCourseRegistration.query.filter_by(course_id=meeting.course_id).all()
+    for registration in registrations:
+        student = registration.student
+        if student and student.role == 'student':
+            add_participant(student, 'student')
+
+    conv.updated_at = datetime.utcnow()
+    db.session.commit()
+    return conv
 
 # Utility to split multi-day events into single-day all-day events
 def split_event_into_days(title, start, end, color, extended_props):
@@ -1116,6 +1170,12 @@ def join_meeting(meeting_id):
             role,
             expires_in=3600,
         )
+        whiteboard_token = build_whiteboard_room_token(
+            current_app.config.get('WHITEBOARD_SDK_TOKEN'),
+            meeting.whiteboard_uuid,
+            current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
+            'admin' if role == 'host' else 'writer',
+        )
     except RuntimeError as exc:
         current_app.logger.error('Agora configuration error: %s', exc)
         flash('Live class service is not configured yet.', 'danger')
@@ -1123,14 +1183,24 @@ def join_meeting(meeting_id):
             url_for('teacher.meetings' if role == 'host' else 'vclass.student_meetings')
         )
 
+    class_conv = ensure_meeting_class_conversation(meeting)
+
     return render_template(
         'vclass/agora_room.html',
         meeting=meeting,
+        class_conversation_id=class_conv.id,
+        class_conversation_name=class_conv.get_meta().get('name') or meeting.title,
+        current_user_public_id=current_user.public_id,
         agora_app_id=current_app.config.get('AGORA_APP_ID'),
         agora_channel=meeting.meeting_code,
         agora_token=token,
         agora_uid=current_user.id,
         agora_role=role,
+        whiteboard_app_identifier=current_app.config.get('WHITEBOARD_APP_IDENTIFIER'),
+        whiteboard_region=current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
+        whiteboard_uuid=meeting.whiteboard_uuid,
+        whiteboard_token=whiteboard_token,
+        whiteboard_uid=str(current_user.id),
     )
 
 @vclass_bp.route('/book-appointment', methods=['GET', 'POST'])
