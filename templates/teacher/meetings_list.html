@@ -25,9 +25,9 @@
       <td>{{ m.scheduled_start }}</td>
       <td>{{ m.scheduled_end }}</td>
       <td>
-        <a href="{{ m.join_url }}" target="_blank" class="btn btn-success btn-sm">Join</a>
-        {% if m.host_id == current_user.user_id %}
-          <a href="{{ m.start_url }}" target="_blank" class="btn btn-primary btn-sm">Start</a>
+        <a href="{{ url_for('vclass.join_meeting', meeting_id=m.id) }}" class="btn btn-success btn-sm">Join</a>
+        {% if m.host_id == current_user.id %}
+          <a href="{{ url_for('vclass.join_meeting', meeting_id=m.id) }}" class="btn btn-primary btn-sm">Start</a>
         {% endif %}
       </td>
     </tr>
