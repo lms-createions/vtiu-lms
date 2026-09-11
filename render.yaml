@@ -3,8 +3,8 @@ services:
     name: vtiu-online
     env: python
     plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m flask --app app db upgrade && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 60 --max-requests 50 --max-requests-jitter 5 --preload --log-level info
+    buildCommand: python -m pip install -r requirements.txt && python -m playwright install chromium
+    startCommand: python -m flask --app app db upgrade && python -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 60 --max-requests 50 --max-requests-jitter 5 --preload --log-level info
     healthCheckPath: /health
     envVars:
       - key: SECRET_KEY
