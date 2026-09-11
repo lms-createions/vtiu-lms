@@ -1,11 +1,11 @@
 {% extends "teacher/base_teacher.html" %}
-{% block title %}Schedule Meeting{% endblock %}
+{% block title %}{{ 'Edit Meeting' if meeting else 'Schedule Meeting' }}{% endblock %}
 
 {% block content %}
 <div class="container mt-3">
   <div class="card shadow-sm">
     <div class="card-header bg-primary text-white">
-      <h5>Schedule New Meeting</h5>
+      <h5>{{ 'Edit Meeting' if meeting else 'Schedule New Meeting' }}</h5>
     </div>
     <div class="card-body">
       <form method="POST">
