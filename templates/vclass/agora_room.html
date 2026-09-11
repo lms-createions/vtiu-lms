@@ -248,8 +248,17 @@
 
   function startWhiteboard() {
     const status = document.getElementById('whiteboard-status');
-    if (!whiteboardConfig.appIdentifier || !whiteboardConfig.uuid || !whiteboardConfig.roomToken) {
-      status.textContent = 'Whiteboard is not configured';
+    if ({{ whiteboard_status|tojson }} === 'migration_pending') {
+      status.textContent = 'Whiteboard requires the latest database migration';
+      return;
+    }
+
+    const missingConfig = [];
+    if (!whiteboardConfig.appIdentifier) missingConfig.push('app identifier');
+    if (!whiteboardConfig.uuid) missingConfig.push('room');
+    if (!whiteboardConfig.roomToken) missingConfig.push('room token');
+    if (missingConfig.length) {
+      status.textContent = `Missing ${missingConfig.join(', ')}`;
       return;
     }
 
