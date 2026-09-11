@@ -3444,9 +3444,10 @@ class Meeting(db.Model):
 
     scheduled_end = db.Column(db.DateTime, nullable=True)
 
-    join_url = db.Column(db.String(500))   # <-- Zoom join URL
+    # Legacy Zoom URLs retained for old records and rollback compatibility.
+    join_url = db.Column(db.String(500))
 
-    start_url = db.Column(db.String(500))  # <-- Zoom host start URL
+    start_url = db.Column(db.String(500))
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
