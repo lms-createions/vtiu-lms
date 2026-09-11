@@ -16,7 +16,7 @@ from reportlab.platypus import Table, TableStyle
 from utils.email import send_password_reset_email
 from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import generate_csrf
-from utils.agora import build_rtc_token, build_whiteboard_room_token
+from utils.agora import build_rtc_token, build_whiteboard_room_token, create_whiteboard_room
 
 vclass_bp = Blueprint('vclass', __name__, url_prefix='/vclass')
 
@@ -1162,6 +1162,15 @@ def join_meeting(meeting_id):
         abort(403)
 
     try:
+        whiteboard_sdk_token = current_app.config.get('WHITEBOARD_SDK_TOKEN')
+        whiteboard_region = current_app.config.get('WHITEBOARD_REGION', 'us-sv')
+        if not meeting.whiteboard_uuid:
+            meeting.whiteboard_uuid = create_whiteboard_room(
+                whiteboard_sdk_token,
+                whiteboard_region,
+            )
+            db.session.commit()
+
         token = build_rtc_token(
             current_app.config.get('AGORA_APP_ID'),
             current_app.config.get('AGORA_APP_CERTIFICATE'),
@@ -1171,14 +1180,14 @@ def join_meeting(meeting_id):
             expires_in=3600,
         )
         whiteboard_token = build_whiteboard_room_token(
-            current_app.config.get('WHITEBOARD_SDK_TOKEN'),
+            whiteboard_sdk_token,
             meeting.whiteboard_uuid,
-            current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
+            whiteboard_region,
             'admin' if role == 'host' else 'writer',
         )
     except RuntimeError as exc:
         current_app.logger.error('Agora configuration error: %s', exc)
-        flash('Live class service is not configured yet.', 'danger')
+        flash(f'Live class service is unavailable: {exc}', 'danger')
         return redirect(
             url_for('teacher.meetings' if role == 'host' else 'vclass.student_meetings')
         )
