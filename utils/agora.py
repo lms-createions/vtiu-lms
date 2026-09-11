@@ -19,10 +19,14 @@ def build_rtc_token(app_id, app_certificate, channel_name, uid, role, expires_in
         )
 
     try:
-        from agora_token_builder import RtcTokenBuilder, Role_Publisher, Role_Subscriber
+        from agora_token_builder.RtcTokenBuilder import (
+            RtcTokenBuilder,
+            Role_Publisher,
+            Role_Subscriber,
+        )
     except ImportError as exc:
         raise RuntimeError(
-            "Agora token support is unavailable. Install the agora-token-builder package."
+            "Agora token support is unavailable. Install agora-token-builder==1.0.0."
         ) from exc
 
     token_role = Role_Publisher if role == "host" else Role_Subscriber
