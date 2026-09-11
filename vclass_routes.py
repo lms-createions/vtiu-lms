@@ -16,6 +16,7 @@ from reportlab.platypus import Table, TableStyle
 from utils.email import send_password_reset_email
 from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import generate_csrf
+from utils.agora import build_rtc_token
 
 vclass_bp = Blueprint('vclass', __name__, url_prefix='/vclass')
 
@@ -1082,6 +1083,54 @@ def student_meetings():
         'vclass/meetings.html',
         meetings=meetings,
         now=now
+    )
+
+
+@vclass_bp.route('/meeting/<int:meeting_id>')
+@login_required
+def join_meeting(meeting_id):
+    """Render an Agora room only for its teacher or registered students."""
+    meeting = Meeting.query.get_or_404(meeting_id)
+
+    if current_user.role == 'teacher':
+        if meeting.host_id != current_user.id:
+            abort(403)
+        role = 'host'
+    elif current_user.role == 'student':
+        registered_course_ids = {
+            registration.course_id
+            for registration in current_user.registered_courses
+        }
+        if meeting.course_id not in registered_course_ids:
+            abort(403)
+        role = 'audience'
+    else:
+        abort(403)
+
+    try:
+        token = build_rtc_token(
+            current_app.config.get('AGORA_APP_ID'),
+            current_app.config.get('AGORA_APP_CERTIFICATE'),
+            meeting.meeting_code,
+            current_user.id,
+            role,
+            expires_in=3600,
+        )
+    except RuntimeError as exc:
+        current_app.logger.error('Agora configuration error: %s', exc)
+        flash('Live class service is not configured yet.', 'danger')
+        return redirect(
+            url_for('teacher.meetings' if role == 'host' else 'vclass.student_meetings')
+        )
+
+    return render_template(
+        'vclass/agora_room.html',
+        meeting=meeting,
+        agora_app_id=current_app.config.get('AGORA_APP_ID'),
+        agora_channel=meeting.meeting_code,
+        agora_token=token,
+        agora_uid=current_user.id,
+        agora_role=role,
     )
 
 @vclass_bp.route('/book-appointment', methods=['GET', 'POST'])
