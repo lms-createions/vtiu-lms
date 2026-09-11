@@ -106,8 +106,13 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get("BREVO_DEFAULT_SENDER", "lampteyjoseph860@gmail.com")
 
     # ------------------------------------------------------
-    # ZOOM (OPTIONAL)
+    # AGORA RTC
     # ------------------------------------------------------
-    ZOOM_ACCOUNT_ID = os.environ.get("ZOOM_ACCOUNT_ID")
-    ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID")
-    ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET")
+    AGORA_APP_ID = os.environ.get("AGORA_APP_ID", "")
+    AGORA_APP_CERTIFICATE = os.environ.get("AGORA_APP_CERTIFICATE", "")
+
+    # Legacy Zoom configuration is intentionally inactive. Keep these values
+    # available for a future rollback without using them in the active flow.
+    # ZOOM_ACCOUNT_ID = os.environ.get("ZOOM_ACCOUNT_ID")
+    # ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID")
+    # ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET")
