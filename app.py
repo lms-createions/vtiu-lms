@@ -657,6 +657,30 @@ def select_portal():
     """Portal selection page"""
     return render_template('portal_selection.html')
 
+
+@app.route('/contact')
+def public_contact():
+    """Public support and contact page."""
+    return render_template('public_page.html', page='contact')
+
+
+@app.route('/privacy')
+def public_privacy():
+    """Public privacy policy page."""
+    return render_template('public_page.html', page='privacy')
+
+
+@app.route('/terms')
+def public_terms():
+    """Public terms of service page."""
+    return render_template('public_page.html', page='terms')
+
+
+@app.route('/refund-policy')
+def public_refund_policy():
+    """Public payment and refund policy page."""
+    return render_template('public_page.html', page='refunds')
+
 @app.route('/logout')
 @login_required
 def logout():
