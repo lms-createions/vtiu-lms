@@ -127,6 +127,7 @@
   const cameraSource = document.getElementById('camera-source');
   const socket = io();
   let localTracks = [];
+  const subscribedUsers = new Set();
   let excalidrawApi = null;
   let applyingRemoteBoard = false;
   let boardUpdateTimer = null;
@@ -284,10 +285,39 @@
     user.videoTrack?.play(tile.id);
   }
 
+  async function subscribeToRemoteUser(user, mediaTypes = ['audio', 'video']) {
+    for (const mediaType of mediaTypes) {
+      try {
+        await client.subscribe(user, mediaType);
+        if (mediaType === 'video') {
+          document.getElementById(`remote-${user.uid}`)?.remove();
+          addRemoteUser(user);
+        }
+        if (mediaType === 'audio') user.audioTrack?.play();
+      } catch (error) {
+        console.error(`Unable to subscribe to ${mediaType} for Agora user ${user.uid}`, error);
+      }
+    }
+    subscribedUsers.add(user.uid);
+  }
+
   client.on('user-published', async (user, mediaType) => {
-    await client.subscribe(user, mediaType);
-    if (mediaType === 'video') addRemoteUser(user);
-    if (mediaType === 'audio') user.audioTrack?.play();
+    await subscribeToRemoteUser(user, [mediaType]);
+  });
+
+  client.on('user-joined', user => {
+    if (user.hasAudio || user.hasVideo) subscribeToRemoteUser(user);
+  });
+
+  client.on('connection-state-change', (curState, prevState, reason) => {
+    console.info(`Agora connection: ${prevState} -> ${curState}${reason ? ` (${reason})` : ''}`);
+    if (curState === 'DISCONNECTED' || curState === 'FAILED') {
+      showError('The live video connection was lost. Refresh the page to reconnect.');
+    }
+  });
+
+  client.on('exception', event => {
+    console.warn('Agora media exception', event);
   });
 
   client.on('user-unpublished', user => {
@@ -298,7 +328,12 @@
     try {
       await client.setClientRole(agoraConfig.role === 'host' ? 'host' : 'audience');
       await client.join(agoraConfig.appId, agoraConfig.channel, agoraConfig.token, agoraConfig.uid);
-      if (agoraConfig.role !== 'host') return;
+      if (agoraConfig.role !== 'host') {
+        await Promise.all(client.remoteUsers
+          .filter(user => !subscribedUsers.has(user.uid))
+          .map(user => subscribeToRemoteUser(user)));
+        return;
+      }
 
       const savedCameraId = window.localStorage.getItem('vtiu-camera-device-id');
       const cameraOptions = savedCameraId ? { cameraId: savedCameraId } : undefined;
