@@ -14,11 +14,13 @@
   <div id="agora-error" class="alert alert-danger d-none" role="alert"></div>
   <div class="row g-3">
     <div id="video-panel" class="col-lg-9">
+      <div id="video-status" class="small text-muted mb-2">Connecting to live video...</div>
       <div id="remote-users" class="row g-2"></div>
       <div id="local-user" class="video-tile d-none">
         <div class="video-label">You</div>
       </div>
     </div>
+    {% if agora_role == 'host' %}
     <div id="whiteboard-panel" class="col-lg-9 d-none">
       <div id="whiteboard-error" class="alert alert-warning d-none" role="alert"></div>
       <div class="whiteboard-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar" aria-label="Whiteboard actions">
@@ -82,13 +84,16 @@
       </div>
       <div id="excalidraw-board" class="excalidraw-board" aria-label="Class whiteboard"></div>
     </div>
+    {% endif %}
     <div class="col-lg-3">
       <div class="card border-0 shadow-sm">
         <div class="card-body">
           <h6>Class controls</h6>
           <div class="btn-group w-100 mb-3" role="group" aria-label="Class view">
             <button id="show-video-view" type="button" class="btn btn-primary btn-sm">Video</button>
+            {% if agora_role == 'host' %}
             <button id="show-board-view" type="button" class="btn btn-outline-primary btn-sm">Whiteboard</button>
+            {% endif %}
           </div>
           {% if agora_role == 'host' %}
           <label for="camera-source" class="form-label small text-muted mt-2 mb-1">Camera source</label>
@@ -171,6 +176,7 @@
   const socket = io();
   let localTracks = [];
   const subscribedUsers = new Set();
+  const subscriptionAttempts = new Map();
   let excalidrawApi = null;
   let applyingRemoteBoard = false;
   let boardUpdateTimer = null;
@@ -237,12 +243,13 @@
 
   function setClassView(view) {
     const showBoard = view === 'board';
+    if (showBoard && (!whiteboardPanel || !showBoardButton)) return;
     videoPanel.classList.toggle('d-none', showBoard);
-    whiteboardPanel.classList.toggle('d-none', !showBoard);
+    whiteboardPanel?.classList.toggle('d-none', !showBoard);
     showVideoButton.classList.toggle('btn-primary', !showBoard);
     showVideoButton.classList.toggle('btn-outline-primary', showBoard);
-    showBoardButton.classList.toggle('btn-primary', showBoard);
-    showBoardButton.classList.toggle('btn-outline-primary', !showBoard);
+    showBoardButton?.classList.toggle('btn-primary', showBoard);
+    showBoardButton?.classList.toggle('btn-outline-primary', !showBoard);
     if (showBoard) ensureWhiteboardLoaded();
   }
 
@@ -319,7 +326,7 @@
     socket.emit('whiteboard_join', { conversation_id: whiteboardConversationId });
   });
   showVideoButton.addEventListener('click', () => setClassView('video'));
-  showBoardButton.addEventListener('click', () => setClassView('board'));
+  showBoardButton?.addEventListener('click', () => setClassView('board'));
 
   function activateBoardTool(button) {
     if (!excalidrawApi) {
@@ -349,10 +356,10 @@
     });
   });
 
-  document.getElementById('board-undo').addEventListener('click', () => excalidrawApi?.history?.undo());
-  document.getElementById('board-redo').addEventListener('click', () => excalidrawApi?.history?.redo());
-  document.getElementById('board-fit').addEventListener('click', () => excalidrawApi?.scrollToContent());
-  document.getElementById('board-export').addEventListener('click', async () => {
+  document.getElementById('board-undo')?.addEventListener('click', () => excalidrawApi?.history?.undo());
+  document.getElementById('board-redo')?.addEventListener('click', () => excalidrawApi?.history?.redo());
+  document.getElementById('board-fit')?.addEventListener('click', () => excalidrawApi?.scrollToContent());
+  document.getElementById('board-export')?.addEventListener('click', async () => {
     if (!excalidrawApi || !exportToBlob) return;
     try {
       const blob = await exportToBlob({
@@ -383,6 +390,7 @@
   }
 
   function addRemoteUser(user) {
+    document.getElementById('video-status').classList.add('d-none');
     const tile = document.createElement('div');
     tile.id = `remote-${user.uid}`;
     tile.className = 'col-md-6 video-tile';
@@ -402,9 +410,21 @@
         if (mediaType === 'audio') user.audioTrack?.play();
       } catch (error) {
         console.error(`Unable to subscribe to ${mediaType} for Agora user ${user.uid}`, error);
+        const attemptKey = `${user.uid}:${mediaType}`;
+        const attempts = subscriptionAttempts.get(attemptKey) || 0;
+        if (attempts < 3) {
+          subscriptionAttempts.set(attemptKey, attempts + 1);
+          window.setTimeout(() => subscribeToRemoteUser(user, [mediaType]), 500 * (attempts + 1));
+        }
       }
     }
     subscribedUsers.add(user.uid);
+  }
+
+  function subscribeToExistingRemoteUsers() {
+    client.remoteUsers.forEach(user => {
+      if (user.hasVideo || user.hasAudio) subscribeToRemoteUser(user);
+    });
   }
 
   client.on('user-published', async (user, mediaType) => {
@@ -417,7 +437,14 @@
 
   client.on('connection-state-change', (curState, prevState, reason) => {
     console.info(`Agora connection: ${prevState} -> ${curState}${reason ? ` (${reason})` : ''}`);
+    const videoStatus = document.getElementById('video-status');
+    if (curState === 'CONNECTED') {
+      videoStatus.textContent = 'Connected. Waiting for the teacher video...';
+      subscribeToExistingRemoteUsers();
+    }
     if (curState === 'DISCONNECTED' || curState === 'FAILED') {
+      videoStatus.textContent = 'Live video connection lost.';
+      videoStatus.classList.remove('d-none');
       showError('The live video connection was lost. Refresh the page to reconnect.');
     }
   });
@@ -432,12 +459,13 @@
 
   async function startRoom() {
     try {
-      await client.setClientRole(agoraConfig.role === 'host' ? 'host' : 'audience');
+      await client.setClientRole(isTeacher ? 'host' : 'audience');
       await client.join(agoraConfig.appId, agoraConfig.channel, agoraConfig.token, agoraConfig.uid);
-      if (agoraConfig.role !== 'host') {
-        await Promise.all(client.remoteUsers
-          .filter(user => !subscribedUsers.has(user.uid))
-          .map(user => subscribeToRemoteUser(user)));
+      if (!isTeacher) {
+        subscribeToExistingRemoteUsers();
+        window.setTimeout(subscribeToExistingRemoteUsers, 500);
+        window.setTimeout(subscribeToExistingRemoteUsers, 1500);
+        window.setTimeout(subscribeToExistingRemoteUsers, 3000);
         return;
       }
 
