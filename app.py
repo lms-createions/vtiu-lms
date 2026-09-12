@@ -98,6 +98,14 @@ IS_PRODUCTION = bool(
 )
 
 logger.info(f"🌍 Environment: {'PRODUCTION (Railway)' if IS_PRODUCTION else 'LOCAL DEVELOPMENT'}")
+logger.info(
+    "🧩 Whiteboard configuration: token=%s (len=%d), app_identifier=%s (len=%d), region=%s",
+    "present" if app.config.get("WHITEBOARD_SDK_TOKEN") else "missing",
+    len(app.config.get("WHITEBOARD_SDK_TOKEN", "")),
+    "present" if app.config.get("WHITEBOARD_APP_IDENTIFIER") else "missing",
+    len(app.config.get("WHITEBOARD_APP_IDENTIFIER", "")),
+    app.config.get("WHITEBOARD_REGION") or "missing",
+)
 
 # ===== Memory Management =====
 import gc
