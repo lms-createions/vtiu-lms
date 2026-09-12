@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{% if page == 'contact' %}Contact VTIU{% elif page == 'privacy' %}Privacy Policy{% elif page == 'terms' %}Terms of Service{% else %}Payment and Refund Policy{% endif %} | VTIU{% endblock %}
+
+{% block content %}
+<style>
+  .public-shell { max-width: 980px; margin: 2.5rem auto 4rem; }
+  .public-hero { background: linear-gradient(135deg, #073b5c, #0b6e69); color: #fff; padding: 3rem; border-radius: 1rem; }
+  .public-hero h1 { font-weight: 800; }
+  .public-panel { background: #fff; border: 1px solid #e3e8ed; border-radius: .75rem; padding: 2rem; margin-top: 1.25rem; }
+  .public-panel h2 { color: #073b5c; font-size: 1.35rem; margin-top: 1.5rem; }
+  .public-panel h2:first-child { margin-top: 0; }
+  .public-links a { color: #0b6e69; font-weight: 600; text-decoration: none; }
+  .public-links a:hover { text-decoration: underline; }
+  .contact-card { border-left: 4px solid #f2a900; background: #fffaf0; padding: 1.25rem; }
+</style>
+
+<div class="public-shell">
+  {% if page == 'contact' %}
+    <section class="public-hero">
+      <p class="text-uppercase small mb-2">VTIU support</p>
+      <h1>We are here to help.</h1>
+      <p class="lead mb-0">Contact our team about admissions, courses, payments, account access, or technical support.</p>
+    </section>
+    <section class="public-panel">
+      <div class="contact-card mb-4">
+        <h2 class="h5 mt-0">Email support</h2>
+        <p class="mb-2">For general enquiries and support, email us and include your name and a brief description of your request.</p>
+        <a class="btn btn-primary" href="mailto:info@vtiu.edu.gh?subject=VTIU%20LMS%20enquiry"><i class="bi bi-envelope me-2"></i>Email info@vtiu.edu.gh</a>
+      </div>
+      <h2>Useful links</h2>
+      <div class="public-links d-flex flex-wrap gap-3">
+        <a href="{{ url_for('select_portal') }}">Access the LMS</a>
+        <a href="{{ url_for('public_privacy') }}">Privacy policy</a>
+        <a href="{{ url_for('public_terms') }}">Terms of service</a>
+        <a href="{{ url_for('public_refund_policy') }}">Payment and refund policy</a>
+      </div>
+    </section>
+  {% elif page == 'privacy' %}
+    <section class="public-hero">
+      <p class="text-uppercase small mb-2">VTIU LMS</p>
+      <h1>Privacy policy</h1>
+      <p class="lead mb-0">How VTIU handles information provided through its learning and payment services.</p>
+    </section>
+    <section class="public-panel">
+      <h2>Information we collect</h2>
+      <p>We collect information needed to provide education services, manage accounts, process applications and payments, communicate with users, and maintain system security. This may include identity, contact, academic, transaction, and technical information.</p>
+      <h2>How we use information</h2>
+      <p>Information is used to deliver courses, manage admissions, record academic activity, confirm payments, provide support, prevent fraud, and meet legal or institutional obligations.</p>
+      <h2>Sharing and security</h2>
+      <p>We limit access to authorized staff and service providers who help operate the LMS. Payment details are processed by our payment provider; VTIU does not request or store card PINs or passwords.</p>
+      <h2>Your choices</h2>
+      <p>You may contact <a href="mailto:info@vtiu.edu.gh">info@vtiu.edu.gh</a> to ask about your information, request corrections, or raise a privacy concern.</p>
+    </section>
+  {% elif page == 'terms' %}
+    <section class="public-hero">
+      <p class="text-uppercase small mb-2">VTIU LMS</p>
+      <h1>Terms of service</h1>
+      <p class="lead mb-0">The rules for using VTIU's online learning and payment services.</p>
+    </section>
+    <section class="public-panel">
+      <h2>Using the service</h2>
+      <p>Users must provide accurate information, keep login credentials private, and use the LMS only for lawful educational and administrative purposes.</p>
+      <h2>Accounts and access</h2>
+      <p>Access may be limited, suspended, or removed where there is suspected misuse, fraud, security risk, or a breach of these terms.</p>
+      <h2>Payments</h2>
+      <p>Fees, payment instructions, and applicable deadlines are shown through the relevant VTIU process. Payment confirmation is subject to successful verification by the payment provider and VTIU.</p>
+      <h2>Support</h2>
+      <p>Questions about these terms can be sent to <a href="mailto:info@vtiu.edu.gh">info@vtiu.edu.gh</a>.</p>
+    </section>
+  {% else %}
+    <section class="public-hero">
+      <p class="text-uppercase small mb-2">VTIU payments</p>
+      <h1>Payment and refund policy</h1>
+      <p class="lead mb-0">Information about payments made through the VTIU LMS.</p>
+    </section>
+    <section class="public-panel">
+      <h2>Payment processing</h2>
+      <p>Payments are processed securely through our payment provider. A transaction is considered received when it is successfully confirmed by the provider and matched to the relevant VTIU record.</p>
+      <h2>Refunds</h2>
+      <p>Refund requests are reviewed by VTIU on a case-by-case basis. Approved refunds are returned through the original payment channel where possible. Processing times may depend on the payment provider and the user's bank or mobile-money service.</p>
+      <h2>How to request a refund</h2>
+      <p>Email <a href="mailto:info@vtiu.edu.gh?subject=VTIU%20payment%20or%20refund%20request">info@vtiu.edu.gh</a> with your name, payment reference, amount, date, and reason for the request. Do not send passwords, PINs, or full card details.</p>
+      <h2>Payment support</h2>
+      <p>For a failed, duplicated, or unrecognized payment, contact us promptly with the transaction reference so we can investigate.</p>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
