@@ -23,6 +23,7 @@
       <div class="whiteboard-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar" aria-label="Whiteboard actions">
         <span class="small text-muted me-auto">
           Shared class whiteboard
+          <span id="whiteboard-status" class="text-muted ms-1">Loading tools...</span>
           {% if agora_role == 'host' %}
           <span class="badge bg-success-subtle text-success ms-1">Teacher tools enabled</span>
           {% else %}
@@ -175,6 +176,7 @@
   let pendingBoardElements = null;
   let cameraDevices = [];
   let exportToBlob = null;
+  let pendingBoardTool = null;
 
   function appendClassChatMessage(message) {
     const item = document.createElement('div');
@@ -264,7 +266,16 @@
     exportToBlob = excalidrawExportToBlob;
     const root = createRoot(document.getElementById('excalidraw-board'));
     root.render(React.createElement(Excalidraw, {
-      excalidrawAPI: api => { excalidrawApi = api; },
+      excalidrawAPI: api => {
+        excalidrawApi = api;
+        document.getElementById('whiteboard-status').textContent = 'Ready';
+        document.getElementById('agora-error').classList.add('d-none');
+        if (pendingBoardTool) {
+          const button = document.querySelector(`.board-tool[data-tool="${pendingBoardTool}"]`);
+          pendingBoardTool = null;
+          if (button) activateBoardTool(button);
+        }
+      },
       viewModeEnabled: !isTeacher,
       zenModeEnabled: false,
       onChange: elements => broadcastBoard(elements),
@@ -297,7 +308,8 @@
 
   function activateBoardTool(button) {
     if (!excalidrawApi) {
-      showError('The whiteboard is still loading. Please try the tool again in a moment.');
+      pendingBoardTool = button.dataset.tool;
+      document.getElementById('whiteboard-status').textContent = 'Loading tools...';
       return;
     }
 
@@ -347,7 +359,11 @@
     if (!excalidrawApi || !window.confirm('Clear the shared class whiteboard for everyone?')) return;
     excalidrawApi.updateScene({ elements: [] });
   });
-  loadExcalidraw().catch(error => console.error('Failed to load Excalidraw', error));
+  loadExcalidraw().catch(error => {
+    console.error('Failed to load Excalidraw', error);
+    document.getElementById('whiteboard-status').textContent = 'Unavailable';
+    showError('The whiteboard could not load. Check the connection and refresh the class page.');
+  });
   setClassView('video');
 
   function showError(message) {
