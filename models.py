@@ -2210,7 +2210,7 @@ class StudentAnswer(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id', ondelete='CASCADE'), nullable=False, index=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id', ondelete='CASCADE'), nullable=False)
 
     question_id = db.Column(db.Integer, db.ForeignKey('question.id', ondelete='CASCADE'), nullable=False, index=True)
 
