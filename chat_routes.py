@@ -133,6 +133,8 @@ def require_group_admin(conv_id):
 # ───────────────
 online_users = set()
 sid_to_pub = {}
+sid_to_class_presence = {}
+class_presence_users = {}
 whiteboard_scenes = {}
 
 # ─────────────────────────
@@ -155,6 +157,30 @@ def on_join(data):
     join_room(f"user_{pub}")
 
     socketio.emit('presence_update', {'user_public_id': pub, 'status': 'online'})
+
+
+@socketio.on('class_presence_join')
+def on_class_presence_join(data):
+    """Track authenticated users currently inside a specific live class."""
+    conversation_id = (data or {}).get('conversation_id')
+    if not _can_access_class_board(conversation_id):
+        return
+
+    pub = getattr(current_user, 'public_id', None)
+    if not pub:
+        return
+
+    presence_room = f'class_presence_{conversation_id}'
+    join_room(presence_room)
+    sid = request.sid
+    sid_to_class_presence[sid] = (conversation_id, pub)
+    users = class_presence_users.setdefault(str(conversation_id), set())
+    users.add(pub)
+    socketio.emit(
+        'class_presence_count',
+        {'conversation_id': conversation_id, 'count': len(users)},
+        room=presence_room,
+    )
 
 
 def _can_access_class_board(conversation_id):
@@ -201,6 +227,20 @@ def on_disconnect():
     """Handle user disconnect."""
     sid = request.sid
     pub = sid_to_pub.pop(sid, None)
+    class_presence = sid_to_class_presence.pop(sid, None)
+
+    if class_presence:
+        conversation_id, class_pub = class_presence
+        users = class_presence_users.get(str(conversation_id), set())
+        users.discard(class_pub)
+        if users:
+            socketio.emit(
+                'class_presence_count',
+                {'conversation_id': conversation_id, 'count': len(users)},
+                room=f'class_presence_{conversation_id}',
+            )
+        else:
+            class_presence_users.pop(str(conversation_id), None)
 
     if not pub:
         pub = getattr(current_user, 'public_id', None)
