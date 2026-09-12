@@ -12,7 +12,7 @@
           <form method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="room-code" class="form-label">Room code</label>
-            <input id="room-code" name="room_code" class="form-control form-control-lg mb-3" value="{{ room_code or '' }}" placeholder="vtiu-..." autocomplete="off" required autofocus>
+            <input id="room-code" name="room_code" class="form-control form-control-lg mb-3" value="{{ room_code or '' }}" placeholder="VTIU0001" minlength="8" maxlength="8" pattern="[Vv][Tt][Ii][Uu][0-9A-Fa-f]{4}" autocomplete="off" required autofocus>
             <button type="submit" class="btn btn-primary w-100">Find class</button>
           </form>
           <a href="{{ url_for('vclass.student_meetings') }}" class="btn btn-link w-100 mt-2">Back to live classes</a>
