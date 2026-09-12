@@ -21,7 +21,6 @@ from utils.helpers import get_programme_choices, get_level_choices, get_course_c
 from utils.academic_year import configured_academic_year
 from wtforms.validators import DataRequired 
 from services.semester_grading_service import SemesterGradingService
-from utils.agora import create_whiteboard_room
 import logging
 
 
@@ -2146,19 +2145,13 @@ def add_meeting():
     form.course_id.choices = [(a.course.id, a.course.name) for a in profile.assignments]
 
     if form.validate_on_submit():
-        duration = int((form.scheduled_end.data - form.scheduled_start.data).total_seconds() // 60)
         try:
-            whiteboard_uuid = create_whiteboard_room(
-                current_app.config.get('WHITEBOARD_SDK_TOKEN'),
-                current_app.config.get('WHITEBOARD_REGION', 'us-sv'),
-            )
             meeting = Meeting(
                 title=form.title.data,
                 description=form.description.data,
                 host_id=current_user.id,
                 course_id=form.course_id.data,
                 meeting_code=create_agora_channel(),
-                whiteboard_uuid=whiteboard_uuid,
                 scheduled_start=form.scheduled_start.data,
                 scheduled_end=form.scheduled_end.data,
             )
@@ -2167,10 +2160,7 @@ def add_meeting():
         except Exception as exc:
             db.session.rollback()
             current_app.logger.exception('Failed to create Agora classroom: %s', exc)
-            flash(
-                f'Could not create the live class. Whiteboard error: {exc}',
-                'danger',
-            )
+            flash('Could not create the live class. Please try again.', 'danger')
             return render_template('teacher/meeting_form.html', form=form)
         flash("Agora live class created successfully!", "success")
         return redirect(url_for("teacher.meetings"))
