@@ -156,6 +156,7 @@
     currentUserName: {{ (current_user.full_name if current_user else 'User')|tojson }}
   };
   const whiteboardConversationId = classChatConfig.conversationId;
+  const isTeacher = String(agoraConfig.role || '').toLowerCase() === 'host';
   const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
   const videoPanel = document.getElementById('video-panel');
   const whiteboardPanel = document.getElementById('whiteboard-panel');
@@ -264,13 +265,13 @@
     const root = createRoot(document.getElementById('excalidraw-board'));
     root.render(React.createElement(Excalidraw, {
       excalidrawAPI: api => { excalidrawApi = api; },
-      viewModeEnabled: agoraConfig.role !== 'host',
+      viewModeEnabled: !isTeacher,
       zenModeEnabled: false,
       onChange: elements => broadcastBoard(elements),
       UIOptions: {
         canvasActions: {
           changeViewBackgroundColor: true,
-          clearCanvas: agoraConfig.role === 'host',
+          clearCanvas: isTeacher,
           export: true,
           loadScene: false,
           saveToActiveFile: false,
@@ -294,12 +295,30 @@
   showVideoButton.addEventListener('click', () => setClassView('video'));
   showBoardButton.addEventListener('click', () => setClassView('board'));
 
+  function activateBoardTool(button) {
+    if (!excalidrawApi) {
+      showError('The whiteboard is still loading. Please try the tool again in a moment.');
+      return;
+    }
+
+    const tool = button.dataset.tool;
+    try {
+      if (typeof excalidrawApi.setActiveTool === 'function') {
+        excalidrawApi.setActiveTool({ type: tool });
+      } else {
+        excalidrawApi.updateScene({ appState: { activeTool: { type: tool } } });
+      }
+      document.querySelectorAll('.board-tool').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+    } catch (error) {
+      console.error(`Unable to activate whiteboard tool: ${tool}`, error);
+      showError('Unable to activate that whiteboard tool. Please refresh the class page.');
+    }
+  }
+
   document.querySelectorAll('.board-tool').forEach(button => {
     button.addEventListener('click', () => {
-      if (!excalidrawApi) return;
-      excalidrawApi.setActiveTool({ type: button.dataset.tool });
-      document.querySelectorAll('.board-tool').forEach(tool => tool.classList.remove('active'));
-      button.classList.add('active');
+      activateBoardTool(button);
     });
   });
 
