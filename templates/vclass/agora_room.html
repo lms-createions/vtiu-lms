@@ -29,6 +29,37 @@
           <span class="badge bg-secondary-subtle text-secondary ms-1">View only</span>
           {% endif %}
         </span>
+        {% if agora_role == 'host' %}
+        <div class="btn-group btn-group-sm" role="group" aria-label="Drawing tools">
+          <button type="button" class="btn btn-outline-secondary board-tool active" data-tool="selection" title="Select" aria-label="Select">
+            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="freedraw" title="Pencil" aria-label="Pencil">
+            <i class="fas fa-pencil" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="eraser" title="Eraser" aria-label="Eraser">
+            <i class="fas fa-eraser" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="line" title="Line" aria-label="Line">
+            <i class="fas fa-minus" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="arrow" title="Arrow" aria-label="Arrow">
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="rectangle" title="Rectangle" aria-label="Rectangle">
+            <i class="far fa-square" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="ellipse" title="Ellipse" aria-label="Ellipse">
+            <i class="far fa-circle" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="diamond" title="Diamond" aria-label="Diamond">
+            <i class="far fa-gem" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary board-tool" data-tool="text" title="Text" aria-label="Text">
+            <i class="fas fa-font" aria-hidden="true"></i>
+          </button>
+        </div>
+        {% endif %}
         <button id="board-undo" type="button" class="btn btn-outline-secondary btn-sm" title="Undo last change" aria-label="Undo last change">
           <i class="fas fa-rotate-left" aria-hidden="true"></i>
         </button>
@@ -97,7 +128,9 @@
   .video-label { position: absolute; z-index: 1; left: .75rem; bottom: .5rem; color: white; background: rgba(0,0,0,.55); padding: .2rem .45rem; border-radius: .25rem; }
   .panel-hidden { display: none !important; }
   .whiteboard-toolbar { min-height: 32px; }
-  .excalidraw-board { height: min(72vh, 760px); min-height: 480px; background: #f8f9fa; border-radius: .5rem; overflow: hidden; }
+  .board-tool.active { background: #0d6efd; color: white; }
+  .excalidraw-board { height: min(72vh, 760px); min-height: 480px; position: relative; background: #f8f9fa; border-radius: .5rem; overflow: hidden; }
+  .excalidraw-board .excalidraw { width: 100%; height: 100%; }
   .chat-thread { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; background: #f8f9fa; border-radius: .5rem; padding: .5rem; }
   .class-chat-message { background: white; border: 1px solid #e9ecef; border-radius: .5rem; padding: .5rem .6rem; }
   .class-chat-message strong { display: block; font-size: .75rem; margin-bottom: .15rem; }
@@ -107,7 +140,7 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.24.2.js"></script>
-<link rel="stylesheet" href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css">
+<link rel="stylesheet" href="https://unpkg.com/@excalidraw/excalidraw@0.18.0/dist/prod/index.css">
 <script>
   const agoraConfig = {
     appId: {{ agora_app_id|tojson }},
@@ -260,6 +293,15 @@
   });
   showVideoButton.addEventListener('click', () => setClassView('video'));
   showBoardButton.addEventListener('click', () => setClassView('board'));
+
+  document.querySelectorAll('.board-tool').forEach(button => {
+    button.addEventListener('click', () => {
+      if (!excalidrawApi) return;
+      excalidrawApi.setActiveTool({ type: button.dataset.tool });
+      document.querySelectorAll('.board-tool').forEach(tool => tool.classList.remove('active'));
+      button.classList.add('active');
+    });
+  });
 
   document.getElementById('board-undo').addEventListener('click', () => excalidrawApi?.history?.undo());
   document.getElementById('board-redo').addEventListener('click', () => excalidrawApi?.history?.redo());
