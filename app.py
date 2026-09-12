@@ -311,11 +311,17 @@ def initialize_database():
             else:
                 logger.warning(f"⚠️ db.create_all() warning: {e}")
 
-        # Normalize legacy values such as 2026/2027 to the single-year format.
+        # Normalize legacy values only when the live table still has the column.
+        inspector = inspect(db.engine)
         for table in db.metadata.sorted_tables:
             year_column = table.c.get('academic_year')
             primary_key = list(table.primary_key.columns)
-            if year_column is None or len(primary_key) != 1:
+            if year_column is None or len(primary_key) != 1 or table.name not in inspector.get_table_names():
+                continue
+            live_columns = {
+                column['name'] for column in inspector.get_columns(table.name)
+            }
+            if 'academic_year' not in live_columns:
                 continue
             try:
                 rows = db.session.execute(
@@ -415,6 +421,21 @@ def initialize_database():
                     "ADD COLUMN is_archived BOOLEAN DEFAULT FALSE"
                 ))
 
+        meeting_columns = {
+            column["name"]
+            for column in inspector.get_columns("meetings")
+        }
+        with db.engine.begin() as connection:
+            if "whiteboard_uuid" not in meeting_columns:
+                logger.info("🔧 Adding missing meetings.whiteboard_uuid column...")
+                connection.execute(text(
+                    "ALTER TABLE meetings ADD COLUMN whiteboard_uuid VARCHAR(120)"
+                ))
+            connection.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_meetings_whiteboard_uuid "
+                "ON meetings (whiteboard_uuid)"
+            ))
+
         grade_column_definitions = {
             "quiz_total_score": "FLOAT",
             "quiz_max_possible": "FLOAT",
@@ -455,7 +476,7 @@ def initialize_database():
                 logger.warning(f"  ⚠️ {table.name}: {e}")
                 db.session.rollback()
         
-        # Double-check critical tables exist by trying to create them explicitly
+        # Verify critical tables without recreating existing tables and indexes.
         logger.info("🔍 Verifying critical tables...")
         critical_tables = [
             (User, "user"),
@@ -484,17 +505,12 @@ def initialize_database():
             (ApplicationPayment, "application_payment"),
         ]
         
-        for model, table_name in critical_tables:
-            try:
-                model.__table__.create(db.engine, checkfirst=True)
+        existing_tables = set(inspect(db.engine).get_table_names())
+        for _model, table_name in critical_tables:
+            if table_name in existing_tables:
                 logger.info(f"  ✓ {table_name}")
-            except Exception as e:
-                if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-                    logger.info(f"  ✓ {table_name} (already exists)")
-                else:
-                    logger.warning(f"  ⚠️ {table_name}: {e}")
-                    # Rollback any failed transaction
-                    db.session.rollback()
+            else:
+                logger.warning(f"  ⚠️ {table_name}: table is missing")
         
         # Check how many tables were created
         inspector = inspect(db.engine)
