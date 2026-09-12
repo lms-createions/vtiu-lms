@@ -402,38 +402,38 @@ def initialize_database():
         # does not alter existing tables, so repair those columns explicitly.
         notification_columns = {
             column["name"]
-            for column in inspector.get_columns("notifications")
+            for column in inspector.get_columns("notification")
         }
         with db.engine.begin() as connection:
             if "created_at" not in notification_columns:
                 connection.execute(text(
-                    "ALTER TABLE notifications "
+                    "ALTER TABLE notification "
                     "ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
                 ))
             if "priority" not in notification_columns:
                 connection.execute(text(
-                    "ALTER TABLE notifications "
+                    "ALTER TABLE notification "
                     "ADD COLUMN priority VARCHAR(20) DEFAULT 'normal'"
                 ))
             if "is_archived" not in notification_columns:
                 connection.execute(text(
-                    "ALTER TABLE notifications "
+                    "ALTER TABLE notification "
                     "ADD COLUMN is_archived BOOLEAN DEFAULT FALSE"
                 ))
 
         meeting_columns = {
             column["name"]
-            for column in inspector.get_columns("meetings")
+            for column in inspector.get_columns("meeting")
         }
         with db.engine.begin() as connection:
             if "whiteboard_uuid" not in meeting_columns:
-                logger.info("🔧 Adding missing meetings.whiteboard_uuid column...")
+                logger.info("🔧 Adding missing meeting.whiteboard_uuid column...")
                 connection.execute(text(
-                    "ALTER TABLE meetings ADD COLUMN whiteboard_uuid VARCHAR(120)"
+                    "ALTER TABLE meeting ADD COLUMN whiteboard_uuid VARCHAR(120)"
                 ))
             connection.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ix_meetings_whiteboard_uuid "
-                "ON meetings (whiteboard_uuid)"
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_meeting_whiteboard_uuid "
+                "ON meeting (whiteboard_uuid)"
             ))
 
         grade_column_definitions = {
@@ -485,9 +485,9 @@ def initialize_database():
             (ProgrammeFeeStructure, "programme_fee_structure"),
             (StudentFeeBalance, "student_fee_balance"),
             (StudentFeeTransaction, "student_fee_transaction"),
-            (Notification, "notifications"),
-            (NotificationRecipient, "notification_recipients"),
-            (NotificationPreference, "notification_preferences"),
+            (Notification, "notification"),
+            (NotificationRecipient, "notification_recipient"),
+            (NotificationPreference, "notification_preference"),
             (Course, "course"),
             (Assignment, "assignment"),
             (Quiz, "quiz"),
@@ -824,21 +824,21 @@ def init_notification_tables():
             
             # Force create notification tables
             Notification.__table__.create(db.engine, checkfirst=True)
-            logger.info("✓ notifications table created/verified")
+            logger.info("✓ notification table created/verified")
             
             NotificationRecipient.__table__.create(db.engine, checkfirst=True)
-            logger.info("✓ notification_recipients table created/verified")
+            logger.info("✓ notification_recipient table created/verified")
             
             NotificationPreference.__table__.create(db.engine, checkfirst=True)
-            logger.info("✓ notification_preferences table created/verified")
+            logger.info("✓ notification_preference table created/verified")
             
             return jsonify({
                 'status': 'success',
                 'message': 'Notification tables created successfully',
                 'tables': [
-                    'notifications',
-                    'notification_recipients',
-                    'notification_preferences'
+                    'notification',
+                    'notification_recipient',
+                    'notification_preference'
                 ]
             }), 200
             
@@ -864,7 +864,7 @@ def check_database():
             # Check for critical tables
             critical_tables = [
                 'user', 'admin', 'student_profile',
-                'notifications', 'notification_recipients',
+                'notification', 'notification_recipient',
                 'course', 'assignment', 'quiz', 'exam'
             ]
             
