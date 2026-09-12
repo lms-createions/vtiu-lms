@@ -14,8 +14,18 @@
   <div id="agora-error" class="alert alert-danger d-none" role="alert"></div>
   <div class="row g-3">
     <div id="video-panel" class="col-lg-9">
-      <div id="video-status" class="small text-muted mb-2">Connecting to live video...</div>
-      <div class="video-stage">
+      <div class="video-panel-header d-flex align-items-center justify-content-between mb-2">
+        <div>
+          <span class="video-panel-title">Live classroom</span>
+          <span id="video-status" class="video-status ms-2">Connecting...</span>
+        </div>
+        {% if agora_role == 'host' %}
+        <span class="live-indicator"><span></span> Teacher preview</span>
+        {% else %}
+        <span class="live-indicator"><span></span> Live class</span>
+        {% endif %}
+      </div>
+      <div class="video-stage{% if agora_role == 'host' %} teacher-video-stage{% endif %}">
         <div id="remote-users" class="video-grid"></div>
         <div id="local-user" class="video-tile local-video-tile d-none">
           <div class="video-label">You</div>
@@ -136,10 +146,17 @@
 </div>
 
 <style>
-  .video-stage { min-height: 560px; height: min(70vh, 760px); padding: .75rem; background: #101820; border: 1px solid #243746; border-radius: .75rem; position: relative; overflow: auto; }
+  .video-panel-title { color: #17212b; font-size: .95rem; font-weight: 700; letter-spacing: .01em; }
+  .video-status { color: #718096; font-size: .78rem; }
+  .live-indicator { display: inline-flex; align-items: center; gap: .4rem; color: #718096; font-size: .75rem; font-weight: 600; }
+  .live-indicator span { width: .45rem; height: .45rem; border-radius: 50%; background: #2fbf71; box-shadow: 0 0 0 .2rem rgba(47,191,113,.14); }
+  .video-stage { min-height: 560px; height: min(70vh, 760px); padding: .75rem; background: #0f1720; border: 1px solid #273646; border-radius: .9rem; position: relative; overflow: hidden; box-shadow: 0 1rem 2.5rem rgba(15,23,32,.14); }
   .video-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .75rem; min-height: 100%; }
   .video-tile { min-height: 320px; height: 100%; background: #17212b; border-radius: .5rem; position: relative; overflow: hidden; }
   .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .teacher-video-stage .video-grid { display: none; }
+  .teacher-video-stage .local-video-tile { position: absolute; inset: .75rem; z-index: 2; width: auto; height: auto; min-height: 0; border: 0; border-radius: .55rem; box-shadow: none; }
+  .teacher-video-stage .local-video-tile video { object-fit: contain; background: #17212b; }
   .local-video-tile { position: absolute; z-index: 2; right: 1.25rem; bottom: 1.25rem; width: min(28%, 260px); height: 180px; min-height: 180px; border: 2px solid #fff; box-shadow: 0 .35rem 1rem rgba(0,0,0,.35); }
   .video-label { position: absolute; z-index: 1; left: .75rem; bottom: .5rem; color: white; background: rgba(0,0,0,.55); padding: .2rem .45rem; border-radius: .25rem; }
   .panel-hidden { display: none !important; }
@@ -147,7 +164,8 @@
   .board-tool.active { background: #0d6efd; color: white; }
   .excalidraw-board { height: min(72vh, 760px); min-height: 480px; position: relative; background: #f8f9fa; border-radius: .5rem; overflow: hidden; }
   .excalidraw-board .excalidraw { width: 100%; height: 100%; }
-  .chat-thread { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; background: #f8f9fa; border-radius: .5rem; padding: .5rem; }
+  .card.border-0.shadow-sm { border: 1px solid #e4eaf0 !important; border-radius: .8rem; box-shadow: 0 .45rem 1.4rem rgba(31,45,61,.07) !important; }
+  .chat-thread { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; background: #f5f7fa; border-radius: .6rem; padding: .5rem; }
   .class-chat-message { background: white; border: 1px solid #e9ecef; border-radius: .5rem; padding: .5rem .6rem; }
   .class-chat-message strong { display: block; font-size: .75rem; margin-bottom: .15rem; }
   .class-chat-message small { color: #6c757d; }
