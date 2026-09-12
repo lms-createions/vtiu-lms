@@ -20,6 +20,7 @@
       </div>
     </div>
     <div id="whiteboard-panel" class="col-lg-9 d-none">
+      <div id="whiteboard-error" class="alert alert-warning d-none" role="alert"></div>
       <div class="whiteboard-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar" aria-label="Whiteboard actions">
         <span class="small text-muted me-auto">
           Shared class whiteboard
@@ -177,6 +178,7 @@
   let cameraDevices = [];
   let exportToBlob = null;
   let pendingBoardTool = null;
+  let whiteboardLoadStarted = false;
 
   function appendClassChatMessage(message) {
     const item = document.createElement('div');
@@ -241,6 +243,7 @@
     showVideoButton.classList.toggle('btn-outline-primary', showBoard);
     showBoardButton.classList.toggle('btn-primary', showBoard);
     showBoardButton.classList.toggle('btn-outline-primary', !showBoard);
+    if (showBoard) ensureWhiteboardLoaded();
   }
 
   function broadcastBoard(elements) {
@@ -291,6 +294,18 @@
         }
       }
     }));
+  }
+
+  function ensureWhiteboardLoaded() {
+    if (whiteboardLoadStarted) return;
+    whiteboardLoadStarted = true;
+    loadExcalidraw().catch(error => {
+      console.error('Failed to load Excalidraw', error);
+      document.getElementById('whiteboard-status').textContent = 'Unavailable';
+      const whiteboardError = document.getElementById('whiteboard-error');
+      whiteboardError.textContent = 'The whiteboard could not load. Check the connection and try again.';
+      whiteboardError.classList.remove('d-none');
+    });
   }
 
   socket.on('whiteboard_update', data => {
@@ -358,11 +373,6 @@
   document.getElementById('board-clear')?.addEventListener('click', () => {
     if (!excalidrawApi || !window.confirm('Clear the shared class whiteboard for everyone?')) return;
     excalidrawApi.updateScene({ elements: [] });
-  });
-  loadExcalidraw().catch(error => {
-    console.error('Failed to load Excalidraw', error);
-    document.getElementById('whiteboard-status').textContent = 'Unavailable';
-    showError('The whiteboard could not load. Check the connection and refresh the class page.');
   });
   setClassView('video');
 
