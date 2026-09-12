@@ -133,6 +133,7 @@ def require_group_admin(conv_id):
 # ───────────────
 online_users = set()
 sid_to_pub = {}
+whiteboard_scenes = {}
 
 # ─────────────────────────
 # SocketIO events
@@ -154,6 +155,46 @@ def on_join(data):
     join_room(f"user_{pub}")
 
     socketio.emit('presence_update', {'user_public_id': pub, 'status': 'online'})
+
+
+def _can_access_class_board(conversation_id):
+    """Allow only participants in the class conversation to use its board."""
+    if not is_user_or_admin() or not conversation_id:
+        return False
+    return ConversationParticipant.query.filter_by(
+        conversation_id=conversation_id,
+        user_public_id=getattr(current_user, 'public_id', None),
+    ).first() is not None
+
+
+@socketio.on('whiteboard_join')
+def on_whiteboard_join(data):
+    conversation_id = (data or {}).get('conversation_id')
+    if not _can_access_class_board(conversation_id):
+        return
+    join_room(f'whiteboard_{conversation_id}')
+    emit('whiteboard_ready', {'conversation_id': conversation_id})
+    emit('whiteboard_update', {
+        'conversation_id': conversation_id,
+        'elements': whiteboard_scenes.get(conversation_id, []),
+    })
+
+
+@socketio.on('whiteboard_update')
+def on_whiteboard_update(data):
+    conversation_id = (data or {}).get('conversation_id')
+    if not _can_access_class_board(conversation_id):
+        return
+    elements = (data or {}).get('elements') or []
+    if not isinstance(elements, list) or len(elements) > 5000:
+        return
+    whiteboard_scenes[conversation_id] = elements
+    socketio.emit(
+        'whiteboard_update',
+        {'conversation_id': conversation_id, 'elements': elements},
+        room=f'whiteboard_{conversation_id}',
+        include_self=False,
+    )
 
 @socketio.on('disconnect')
 def on_disconnect():
