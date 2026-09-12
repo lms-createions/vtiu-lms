@@ -21,7 +21,14 @@
     </div>
     <div id="whiteboard-panel" class="col-lg-9 d-none">
       <div class="whiteboard-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar" aria-label="Whiteboard actions">
-        <span class="small text-muted me-auto">Shared class whiteboard</span>
+        <span class="small text-muted me-auto">
+          Shared class whiteboard
+          {% if agora_role == 'host' %}
+          <span class="badge bg-success-subtle text-success ms-1">Teacher tools enabled</span>
+          {% else %}
+          <span class="badge bg-secondary-subtle text-secondary ms-1">View only</span>
+          {% endif %}
+        </span>
         <button id="board-undo" type="button" class="btn btn-outline-secondary btn-sm" title="Undo last change" aria-label="Undo last change">
           <i class="fas fa-rotate-left" aria-hidden="true"></i>
         </button>
@@ -224,8 +231,20 @@
     const root = createRoot(document.getElementById('excalidraw-board'));
     root.render(React.createElement(Excalidraw, {
       excalidrawAPI: api => { excalidrawApi = api; },
+      viewModeEnabled: agoraConfig.role !== 'host',
+      zenModeEnabled: false,
       onChange: elements => broadcastBoard(elements),
-      UIOptions: { canvasActions: { loadScene: false, saveToActiveFile: false } }
+      UIOptions: {
+        canvasActions: {
+          changeViewBackgroundColor: true,
+          clearCanvas: agoraConfig.role === 'host',
+          export: true,
+          loadScene: false,
+          saveToActiveFile: false,
+          saveToDisk: true,
+          toggleTheme: true
+        }
+      }
     }));
   }
 
