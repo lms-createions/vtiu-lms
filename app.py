@@ -37,7 +37,22 @@ def inject_configured_academic_year():
 db.init_app(app)
 migrate = Migrate(app, db)
 mail.init_app(app)
-socketio.init_app(app, cors_allowed_origins="*", async_mode='threading')
+socketio_options = {
+    'cors_allowed_origins': '*',
+}
+requested_socketio_mode = os.environ.get('SOCKETIO_ASYNC_MODE', '').strip().lower()
+if requested_socketio_mode in {'eventlet', 'threading'}:
+    socketio_options['async_mode'] = requested_socketio_mode
+elif os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RAILWAY_ENVIRONMENT'):
+    socketio_options['async_mode'] = 'eventlet'
+else:
+    socketio_options['async_mode'] = 'threading'
+if app.config.get('REDIS_URL'):
+    socketio_options['message_queue'] = app.config['REDIS_URL']
+    app.logger.info('SocketIO Redis message queue enabled')
+else:
+    app.logger.info('SocketIO Redis message queue disabled; using local process events')
+socketio.init_app(app, **socketio_options)
 csrf = CSRFProtect(app)
 
 
