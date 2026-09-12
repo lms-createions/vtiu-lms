@@ -48,19 +48,30 @@ def create_whiteboard_room(sdk_token, region):
     if not sdk_token:
         raise RuntimeError("Whiteboard is not configured. Set WHITEBOARD_SDK_TOKEN.")
 
-    response = requests.post(
-        f"{WHITEBOARD_API_URL}/rooms",
-        headers={
-            "token": sdk_token,
-            "region": region,
-            "Content-Type": "application/json",
-        },
-        json={"isRecord": False},
-        timeout=15,
-    )
+    try:
+        response = requests.post(
+            f"{WHITEBOARD_API_URL}/rooms",
+            headers={
+                "token": sdk_token,
+                "region": region,
+                "Content-Type": "application/json",
+            },
+            json={"isRecord": False},
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Whiteboard API request failed: {exc}") from exc
+
     if response.status_code != 201:
-        raise RuntimeError(f"Whiteboard room creation failed: {response.status_code}")
-    room = response.json()
+        detail = response.text[:300].replace("\n", " ").strip()
+        raise RuntimeError(
+            f"Whiteboard room creation failed: HTTP {response.status_code}"
+            + (f" ({detail})" if detail else "")
+        )
+    try:
+        room = response.json()
+    except ValueError as exc:
+        raise RuntimeError("Whiteboard room response was not valid JSON.") from exc
     if not room.get("uuid"):
         raise RuntimeError("Whiteboard room response did not contain a UUID.")
     return room["uuid"]
