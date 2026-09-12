@@ -9,26 +9,6 @@
     <span class="text-muted small">Auto-updates when class goes live</span>
   </div>
 
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-body">
-      <h6 class="mb-1">Join with teacher's room code</h6>
-      <p class="text-muted small mb-3">Enter the exact room code shared by your teacher.</p>
-      <form method="post" action="{{ url_for('vclass.join_meeting_by_code') }}" class="row g-2">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="col-md-9">
-          <label class="visually-hidden" for="room-code">Room code</label>
-          <input id="room-code" name="room_code" class="form-control" placeholder="vtiu-..." autocomplete="off" required>
-        </div>
-        <div class="col-md-3 d-grid">
-          <button type="submit" class="btn btn-primary">Join room</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  <div class="text-end mb-3">
-    <a href="{{ url_for('vclass.join_meeting_by_code') }}" class="small">Open manual room join</a>
-  </div>
-
   {% if meetings %}
   <div class="row g-4">
 
@@ -98,7 +78,7 @@
         <!-- Action -->
         <div class="card-footer bg-white border-0">
           {% if is_live %}
-            <a href="{{ url_for('vclass.join_meeting', meeting_id=m.id) }}"
+            <a href="{{ url_for('vclass.join_meeting_by_code') }}"
                class="btn btn-{{ course_color }} w-100">
               Join Live Class
             </a>
