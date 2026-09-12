@@ -110,6 +110,7 @@ class Config:
         # ------------------------------------------------------
         AGORA_APP_ID = os.environ.get("AGORA_APP_ID", "").strip()
         AGORA_APP_CERTIFICATE = os.environ.get("AGORA_APP_CERTIFICATE", "").strip()
+        AGORA_CHANNEL_PROFILE = os.environ.get("AGORA_CHANNEL_PROFILE", "live").strip().lower()
 
         # Legacy Zoom configuration is intentionally inactive. Keep these values
         # available for a future rollback without using them in the active flow.
