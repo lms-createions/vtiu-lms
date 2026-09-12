@@ -31,6 +31,10 @@
             <button id="show-board-view" type="button" class="btn btn-outline-primary btn-sm">Whiteboard</button>
           </div>
           {% if agora_role == 'host' %}
+          <label for="camera-source" class="form-label small text-muted mt-2 mb-1">Camera source</label>
+          <select id="camera-source" class="form-select form-select-sm mb-2" aria-label="Choose camera source">
+            <option value="">Detecting cameras...</option>
+          </select>
           <button id="toggle-mic" class="btn btn-success w-100 mb-2">Mute microphone</button>
           <button id="toggle-camera" class="btn btn-success w-100 mb-2">Turn camera off</button>
           <button id="share-screen" class="btn btn-outline-primary w-100">Share screen</button>
@@ -99,12 +103,14 @@
   const classChatMessages = document.getElementById('class-chat-messages');
   const classChatInput = document.getElementById('class-chat-input');
   const classChatSend = document.getElementById('class-chat-send');
+  const cameraSource = document.getElementById('camera-source');
   const socket = io();
   let localTracks = [];
   let excalidrawApi = null;
   let applyingRemoteBoard = false;
   let boardUpdateTimer = null;
   let pendingBoardElements = null;
+  let cameraDevices = [];
 
   function appendClassChatMessage(message) {
     const item = document.createElement('div');
@@ -245,10 +251,37 @@
       await client.join(agoraConfig.appId, agoraConfig.channel, agoraConfig.token, agoraConfig.uid);
       if (agoraConfig.role !== 'host') return;
 
-      localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+      const savedCameraId = window.localStorage.getItem('vtiu-camera-device-id');
+      const cameraOptions = savedCameraId ? { cameraId: savedCameraId } : undefined;
+      try {
+        localTracks = await AgoraRTC.createMicrophoneAndCameraTracks({}, cameraOptions);
+      } catch (cameraError) {
+        console.warn('Saved camera unavailable; using the browser default camera.', cameraError);
+        localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+      }
       document.getElementById('local-user').classList.remove('d-none');
       localTracks[1].play('local-user');
       await client.publish(localTracks);
+      await refreshCameraDevices();
+
+      cameraSource.onchange = async event => {
+        const deviceId = event.target.value;
+        if (!deviceId || !localTracks[1]) return;
+        try {
+          const replacementTrack = await AgoraRTC.createCameraVideoTrack({ cameraId: deviceId });
+          await client.unpublish(localTracks[1]);
+          localTracks[1].stop();
+          localTracks[1].close();
+          localTracks[1] = replacementTrack;
+          replacementTrack.play('local-user');
+          await client.publish(replacementTrack);
+          window.localStorage.setItem('vtiu-camera-device-id', deviceId);
+        } catch (error) {
+          console.error('Unable to switch camera source', error);
+          showError('Unable to switch to that camera. Check browser permissions and try again.');
+          await refreshCameraDevices();
+        }
+      };
 
       document.getElementById('toggle-mic').onclick = async event => {
         const enabled = localTracks[0].enabled;
@@ -267,11 +300,38 @@
         localTracks[1] = screenTrack;
         screenTrack.play('local-user');
         await client.publish(screenTrack);
+        cameraSource.disabled = true;
         event.target.disabled = true;
       };
     } catch (error) {
       console.error(error);
       showError('Unable to join this live class. Check your connection and try again.');
+    }
+  }
+
+  async function refreshCameraDevices() {
+    if (!cameraSource || !AgoraRTC.getCameras) return;
+    try {
+      cameraDevices = await AgoraRTC.getCameras();
+      const selectedId = window.localStorage.getItem('vtiu-camera-device-id');
+      cameraSource.innerHTML = '';
+      cameraDevices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.textContent = device.label || `Camera ${index + 1}`;
+        cameraSource.appendChild(option);
+      });
+      const activeLabel = localTracks[1]?.getTrackLabel?.();
+      const activeDevice = cameraDevices.find(device => device.label === activeLabel);
+      cameraSource.value = selectedId && cameraDevices.some(device => device.deviceId === selectedId)
+        ? selectedId
+        : activeDevice?.deviceId || cameraDevices[0]?.deviceId || '';
+      if (!cameraDevices.length) {
+        cameraSource.innerHTML = '<option value="">No camera detected</option>';
+      }
+    } catch (error) {
+      console.error('Unable to list camera devices', error);
+      cameraSource.innerHTML = '<option value="">Camera list unavailable</option>';
     }
   }
 
