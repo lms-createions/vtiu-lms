@@ -86,20 +86,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===== Configuration =====
-# Check if we're in production (Render or Railway deployment)
+# Check if we're in the Railway production environment.
 IS_PRODUCTION = bool(
     app.config.get("IS_PRODUCTION")
     or os.environ.get("IS_PRODUCTION") in ("1", "true", "True")
     or os.environ.get("FLASK_ENV", "").lower() == "production"
-    or os.environ.get("RENDER") == "true"  # Render sets this automatically
-    or "render.com" in os.environ.get("RENDER_EXTERNAL_URL", "")
     or os.environ.get("RAILWAY_ENVIRONMENT")
     or os.environ.get("RAILWAY_ENVIRONMENT_NAME")
     or os.environ.get("RAILWAY_PROJECT_ID")
     or os.environ.get("RAILWAY_SERVICE_ID")
 )
 
-logger.info(f"🌍 Environment: {'PRODUCTION (Render)' if IS_PRODUCTION else 'LOCAL DEVELOPMENT'}")
+logger.info(f"🌍 Environment: {'PRODUCTION (Railway)' if IS_PRODUCTION else 'LOCAL DEVELOPMENT'}")
 
 # ===== Memory Management =====
 import gc
