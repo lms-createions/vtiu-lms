@@ -98,14 +98,6 @@ IS_PRODUCTION = bool(
 )
 
 logger.info(f"🌍 Environment: {'PRODUCTION (Railway)' if IS_PRODUCTION else 'LOCAL DEVELOPMENT'}")
-logger.info(
-    "🧩 Whiteboard configuration: token=%s (len=%d), app_identifier=%s (len=%d), region=%s",
-    "present" if app.config.get("WHITEBOARD_SDK_TOKEN") else "missing",
-    len(app.config.get("WHITEBOARD_SDK_TOKEN", "")),
-    "present" if app.config.get("WHITEBOARD_APP_IDENTIFIER") else "missing",
-    len(app.config.get("WHITEBOARD_APP_IDENTIFIER", "")),
-    app.config.get("WHITEBOARD_REGION") or "missing",
-)
 
 # ===== Memory Management =====
 import gc
@@ -426,21 +418,6 @@ def initialize_database():
                     "ALTER TABLE notification "
                     "ADD COLUMN is_archived BOOLEAN DEFAULT FALSE"
                 ))
-
-        meeting_columns = {
-            column["name"]
-            for column in inspector.get_columns("meeting")
-        }
-        with db.engine.begin() as connection:
-            if "whiteboard_uuid" not in meeting_columns:
-                logger.info("🔧 Adding missing meeting.whiteboard_uuid column...")
-                connection.execute(text(
-                    "ALTER TABLE meeting ADD COLUMN whiteboard_uuid VARCHAR(120)"
-                ))
-            connection.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ix_meeting_whiteboard_uuid "
-                "ON meeting (whiteboard_uuid)"
-            ))
 
         grade_column_definitions = {
             "quiz_total_score": "FLOAT",
