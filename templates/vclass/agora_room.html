@@ -229,6 +229,7 @@
   let pendingBoardTool = null;
   let whiteboardLoadStarted = false;
   let isBroadcasting = false;
+  let participantRefreshTimer = null;
 
   function appendClassChatMessage(message) {
     const item = document.createElement('div');
@@ -434,6 +435,8 @@
   }
 
   function addRemoteUser(user) {
+    const videoStatus = document.getElementById('video-status');
+    videoStatus.textContent = 'Teacher video connected';
     document.getElementById('video-status').classList.add('d-none');
     const tile = document.createElement('div');
     tile.id = `remote-${user.uid}`;
@@ -445,7 +448,12 @@
   }
 
   function updateParticipantCount() {
-    if (participantCount) participantCount.textContent = client.remoteUsers.length;
+    if (participantCount) {
+      participantCount.textContent = client.remoteUsers.length;
+      participantCount.parentElement.setAttribute(
+        'aria-label', `${client.remoteUsers.length} connected participants`
+      );
+    }
   }
 
   async function subscribeToRemoteUser(user, mediaTypes = ['audio', 'video']) {
@@ -484,6 +492,7 @@
 
   client.on('user-published', async (user, mediaType) => {
     await subscribeToRemoteUser(user, [mediaType]);
+    updateParticipantCount();
   });
 
   client.on('user-joined', user => {
@@ -494,13 +503,21 @@
   client.on('user-left', user => {
     document.getElementById(`remote-${user.uid}`)?.remove();
     updateParticipantCount();
+    if (!isTeacher && client.remoteUsers.length === 0) {
+      const videoStatus = document.getElementById('video-status');
+      videoStatus.textContent = 'Connected. Waiting for the teacher video...';
+      videoStatus.classList.remove('d-none');
+    }
   });
 
   client.on('connection-state-change', (curState, prevState, reason) => {
     console.info(`Agora connection: ${prevState} -> ${curState}${reason ? ` (${reason})` : ''}`);
     const videoStatus = document.getElementById('video-status');
     if (curState === 'CONNECTED') {
-      videoStatus.textContent = 'Connected. Waiting for the teacher video...';
+      videoStatus.textContent = isTeacher
+        ? 'Connected. Camera preview is ready.'
+        : 'Connected. Waiting for the teacher video...';
+      videoStatus.classList.remove('d-none');
       subscribeToExistingRemoteUsers();
     }
     if (curState === 'DISCONNECTED' || curState === 'FAILED') {
@@ -512,6 +529,7 @@
 
   client.on('user-unpublished', user => {
     document.getElementById(`remote-${user.uid}`)?.remove();
+    updateParticipantCount();
   });
 
   async function startRoom() {
@@ -521,6 +539,7 @@
       }
       await client.join(agoraConfig.appId, agoraConfig.channel, agoraConfig.token, agoraConfig.uid);
       updateParticipantCount();
+      participantRefreshTimer = window.setInterval(updateParticipantCount, 1000);
       if (!isTeacher) {
         subscribeToExistingRemoteUsers();
         window.setTimeout(subscribeToExistingRemoteUsers, 500);
@@ -542,6 +561,7 @@
       startLiveButton.disabled = false;
       shareScreenButton.disabled = true;
       broadcastStatus.textContent = 'Camera ready. Start the live class when you are ready.';
+      document.getElementById('video-status').textContent = 'Camera preview ready';
       await refreshCameraDevices();
 
       cameraSource.onchange = async event => {
@@ -584,6 +604,7 @@
             event.target.classList.add('btn-danger');
             shareScreenButton.disabled = true;
             broadcastStatus.textContent = 'Live class stopped. Start again when ready.';
+            document.getElementById('video-status').textContent = 'Broadcast stopped';
           } catch (error) {
             console.error('Unable to stop live class', error);
           }
@@ -599,6 +620,7 @@
           event.target.disabled = false;
           shareScreenButton.disabled = false;
           broadcastStatus.textContent = 'Live. Students can now join the broadcast.';
+          document.getElementById('video-status').textContent = 'Live and broadcasting';
         } catch (error) {
           console.error('Unable to start live class', error);
           broadcastStatus.textContent = 'Unable to start live class. Check your connection.';
@@ -654,7 +676,10 @@
     }
   }
 
-  window.addEventListener('beforeunload', () => localTracks.forEach(track => track.close()));
+  window.addEventListener('beforeunload', () => {
+    if (participantRefreshTimer) window.clearInterval(participantRefreshTimer);
+    localTracks.forEach(track => track.close());
+  });
   startRoom();
 </script>
 {% endblock %}
