@@ -269,6 +269,16 @@
 
   socket.on('connect', () => {
     socket.emit('join', { user_id: classChatConfig.currentUserId });
+    socket.emit('class_presence_join', {
+      conversation_id: classChatConfig.conversationId
+    });
+  });
+
+  let livePresenceCount = null;
+  socket.on('class_presence_count', data => {
+    if (String(data.conversation_id) !== String(classChatConfig.conversationId)) return;
+    livePresenceCount = Math.max(0, Number(data.count || 0) - (isTeacher ? 1 : 0));
+    updateParticipantCount();
   });
 
   socket.on('new_message', (data) => {
@@ -449,9 +459,12 @@
 
   function updateParticipantCount() {
     if (participantCount) {
-      participantCount.textContent = client.remoteUsers.length;
+      const count = livePresenceCount === null
+        ? client.remoteUsers.length
+        : livePresenceCount;
+      participantCount.textContent = count;
       participantCount.parentElement.setAttribute(
-        'aria-label', `${client.remoteUsers.length} connected participants`
+        'aria-label', `${count} connected participants`
       );
     }
   }
