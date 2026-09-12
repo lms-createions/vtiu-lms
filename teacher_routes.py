@@ -2167,7 +2167,10 @@ def add_meeting():
         except Exception as exc:
             db.session.rollback()
             current_app.logger.exception('Failed to create Agora classroom: %s', exc)
-            flash('Could not create the live class. Check Agora Whiteboard configuration.', 'danger')
+            flash(
+                f'Could not create the live class. Whiteboard error: {exc}',
+                'danger',
+            )
             return render_template('teacher/meeting_form.html', form=form)
         flash("Agora live class created successfully!", "success")
         return redirect(url_for("teacher.meetings"))
