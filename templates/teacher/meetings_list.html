@@ -14,6 +14,7 @@
       <th>Course</th>
       <th>Start</th>
       <th>End</th>
+      <th>Room code</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -24,6 +25,16 @@
       <td>{{ m.course.name }}</td>
       <td>{{ m.scheduled_start }}</td>
       <td>{{ m.scheduled_end }}</td>
+      <td>
+        {% if m.host_id == current_user.id %}
+          <div class="input-group input-group-sm room-code-group">
+            <input class="form-control room-code" value="{{ m.meeting_code }}" readonly aria-label="Room code for {{ m.title }}">
+            <button type="button" class="btn btn-outline-secondary copy-room-code" title="Copy room code" aria-label="Copy room code">
+              <i class="fas fa-copy" aria-hidden="true"></i>
+            </button>
+          </div>
+        {% endif %}
+      </td>
       <td>
         {% if m.host_id == current_user.id %}
           <a href="{{ url_for('vclass.join_meeting', meeting_id=m.id) }}" class="btn btn-primary btn-sm">Start</a>
@@ -103,6 +114,22 @@
         deleteMeetingForm.submit();
       }
     }
+  });
+
+  document.querySelectorAll('.copy-room-code').forEach(button => {
+    button.addEventListener('click', async () => {
+      const input = button.closest('.room-code-group')?.querySelector('.room-code');
+      if (!input) return;
+      try {
+        await navigator.clipboard.writeText(input.value);
+        const original = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
+        window.setTimeout(() => { button.innerHTML = original; }, 1200);
+      } catch (error) {
+        input.select();
+        document.execCommand('copy');
+      }
+    });
   });
 </script>
 {% endblock %}
