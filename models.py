@@ -3438,7 +3438,6 @@ class Meeting(db.Model):
 
     meeting_code = db.Column(db.String(80), unique=True, index=True, nullable=False)
 
-    whiteboard_uuid = db.Column(db.String(120), unique=True, nullable=True, index=True)
 
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
 
@@ -3912,3 +3911,5 @@ class StudentPromotion(db.Model):
             'notes': self.notes
 
         }
+
+    
