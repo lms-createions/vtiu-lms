@@ -104,7 +104,11 @@
           </select>
           <button id="toggle-mic" class="btn btn-success w-100 mb-2">Mute microphone</button>
           <button id="toggle-camera" class="btn btn-success w-100 mb-2">Turn camera off</button>
-          <button id="share-screen" class="btn btn-outline-primary w-100">Share screen</button>
+          <button id="start-live" class="btn btn-danger w-100 mb-2" disabled>
+            <i class="fas fa-video me-1" aria-hidden="true"></i>Start live class
+          </button>
+          <button id="share-screen" class="btn btn-outline-primary w-100" disabled>Share screen</button>
+          <div id="broadcast-status" class="small text-muted mt-2">Preparing camera...</div>
           {% else %}
           <p class="text-muted small mb-0">You are attending as a student. The teacher controls the broadcast.</p>
           {% endif %}
@@ -184,6 +188,9 @@
   const classChatInput = document.getElementById('class-chat-input');
   const classChatSend = document.getElementById('class-chat-send');
   const cameraSource = document.getElementById('camera-source');
+  const startLiveButton = document.getElementById('start-live');
+  const shareScreenButton = document.getElementById('share-screen');
+  const broadcastStatus = document.getElementById('broadcast-status');
   const socket = io();
   let localTracks = [];
   const subscribedUsers = new Set();
@@ -196,6 +203,7 @@
   let exportToBlob = null;
   let pendingBoardTool = null;
   let whiteboardLoadStarted = false;
+  let isBroadcasting = false;
 
   function appendClassChatMessage(message) {
     const item = document.createElement('div');
@@ -494,7 +502,9 @@
       }
       document.getElementById('local-user').classList.remove('d-none');
       localTracks[1].play('local-user');
-      await client.publish(localTracks);
+      startLiveButton.disabled = false;
+      shareScreenButton.disabled = true;
+      broadcastStatus.textContent = 'Camera ready. Start the live class when you are ready.';
       await refreshCameraDevices();
 
       cameraSource.onchange = async event => {
@@ -526,15 +536,54 @@
         await localTracks[1].setEnabled(!enabled);
         event.target.textContent = enabled ? 'Turn camera on' : 'Turn camera off';
       };
-      document.getElementById('share-screen').onclick = async event => {
-        const screenTrack = await AgoraRTC.createScreenVideoTrack();
-        await client.unpublish(localTracks[1]);
-        localTracks[1].close();
-        localTracks[1] = screenTrack;
-        screenTrack.play('local-user');
-        await client.publish(screenTrack);
-        cameraSource.disabled = true;
+      startLiveButton.onclick = async event => {
         event.target.disabled = true;
+        if (isBroadcasting) {
+          try {
+            await client.unpublish(localTracks);
+            isBroadcasting = false;
+            event.target.innerHTML = '<i class="fas fa-video me-1" aria-hidden="true"></i>Start live class';
+            event.target.classList.remove('btn-outline-danger');
+            event.target.classList.add('btn-danger');
+            shareScreenButton.disabled = true;
+            broadcastStatus.textContent = 'Live class stopped. Start again when ready.';
+          } catch (error) {
+            console.error('Unable to stop live class', error);
+          }
+          event.target.disabled = false;
+          return;
+        }
+        try {
+          await client.publish(localTracks);
+          isBroadcasting = true;
+          event.target.innerHTML = '<i class="fas fa-stop me-1" aria-hidden="true"></i>Stop live class';
+          event.target.classList.remove('btn-danger');
+          event.target.classList.add('btn-outline-danger');
+          event.target.disabled = false;
+          shareScreenButton.disabled = false;
+          broadcastStatus.textContent = 'Live. Students can now join the broadcast.';
+        } catch (error) {
+          console.error('Unable to start live class', error);
+          broadcastStatus.textContent = 'Unable to start live class. Check your connection.';
+          event.target.disabled = false;
+        }
+      };
+      shareScreenButton.onclick = async event => {
+        if (!isBroadcasting) return;
+        try {
+          const screenTrack = await AgoraRTC.createScreenVideoTrack();
+          await client.unpublish(localTracks[1]);
+          localTracks[1].close();
+          localTracks[1] = screenTrack;
+          screenTrack.play('local-user');
+          await client.publish(screenTrack);
+          cameraSource.disabled = true;
+          event.target.disabled = true;
+          broadcastStatus.textContent = 'Live screen sharing.';
+        } catch (error) {
+          console.error('Unable to share screen', error);
+          broadcastStatus.textContent = 'Unable to share the screen.';
+        }
       };
     } catch (error) {
       console.error(error);
