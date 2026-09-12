@@ -675,10 +675,10 @@ def submit_quiz(quiz_id):
     # Ensure `is_correct` column exists (might be missing after model change)
     try:
         inspector = inspect(db.engine)
-        cols = [c['name'] for c in inspector.get_columns('student_answers')]
+        cols = [c['name'] for c in inspector.get_columns('student_answer')]
         if 'is_correct' not in cols:
             with db.engine.connect() as conn:
-                conn.execute(text("ALTER TABLE student_answers ADD COLUMN is_correct BOOLEAN DEFAULT 0"))
+                conn.execute(text("ALTER TABLE student_answer ADD COLUMN is_correct BOOLEAN DEFAULT 0"))
     except Exception as _:
         current_app.logger.debug('Could not ensure is_correct column exists: %s', _)
 
