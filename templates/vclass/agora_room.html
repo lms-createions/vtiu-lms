@@ -20,7 +20,10 @@
           <span id="video-status" class="video-status ms-2">Connecting...</span>
         </div>
         {% if agora_role == 'host' %}
-        <span class="live-indicator"><span></span> Teacher preview</span>
+        <div class="video-header-meta">
+          <span class="participant-count"><i class="fas fa-users" aria-hidden="true"></i> <strong id="participant-count">0</strong> participants</span>
+          <span class="live-indicator"><span></span> Teacher preview</span>
+        </div>
         {% else %}
         <span class="live-indicator"><span></span> Live class</span>
         {% endif %}
@@ -150,6 +153,9 @@
   .video-status { color: #718096; font-size: .78rem; }
   .live-indicator { display: inline-flex; align-items: center; gap: .4rem; color: #718096; font-size: .75rem; font-weight: 600; }
   .live-indicator span { width: .45rem; height: .45rem; border-radius: 50%; background: #2fbf71; box-shadow: 0 0 0 .2rem rgba(47,191,113,.14); }
+  .video-header-meta { display: inline-flex; align-items: center; gap: 1rem; }
+  .participant-count { color: #526273; font-size: .78rem; font-weight: 600; }
+  .participant-count i { color: #0d6efd; margin-right: .15rem; }
   .video-stage { min-height: 560px; height: min(70vh, 760px); padding: .75rem; background: #0f1720; border: 1px solid #273646; border-radius: .9rem; position: relative; overflow: hidden; box-shadow: 0 1rem 2.5rem rgba(15,23,32,.14); }
   .video-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .75rem; min-height: 100%; }
   .video-tile { min-height: 320px; height: 100%; background: #17212b; border-radius: .5rem; position: relative; overflow: hidden; }
@@ -209,6 +215,7 @@
   const startLiveButton = document.getElementById('start-live');
   const shareScreenButton = document.getElementById('share-screen');
   const broadcastStatus = document.getElementById('broadcast-status');
+  const participantCount = document.getElementById('participant-count');
   const socket = io();
   let localTracks = [];
   const subscribedUsers = new Set();
@@ -434,6 +441,11 @@
     tile.innerHTML = `<div class="video-label">Teacher</div>`;
     document.getElementById('remote-users').appendChild(tile);
     user.videoTrack?.play(tile.id);
+    updateParticipantCount();
+  }
+
+  function updateParticipantCount() {
+    if (participantCount) participantCount.textContent = client.remoteUsers.length;
   }
 
   async function subscribeToRemoteUser(user, mediaTypes = ['audio', 'video']) {
@@ -475,7 +487,13 @@
   });
 
   client.on('user-joined', user => {
+    updateParticipantCount();
     if (user.hasAudio || user.hasVideo) subscribeToRemoteUser(user);
+  });
+
+  client.on('user-left', user => {
+    document.getElementById(`remote-${user.uid}`)?.remove();
+    updateParticipantCount();
   });
 
   client.on('connection-state-change', (curState, prevState, reason) => {
@@ -502,6 +520,7 @@
         await client.setClientRole(isTeacher ? 'host' : 'audience');
       }
       await client.join(agoraConfig.appId, agoraConfig.channel, agoraConfig.token, agoraConfig.uid);
+      updateParticipantCount();
       if (!isTeacher) {
         subscribeToExistingRemoteUsers();
         window.setTimeout(subscribeToExistingRemoteUsers, 500);
