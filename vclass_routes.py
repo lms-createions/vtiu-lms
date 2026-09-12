@@ -1190,6 +1190,7 @@ def join_meeting(meeting_id):
         agora_token=token,
         agora_uid=current_user.id,
         agora_role=role,
+        agora_channel_profile=current_app.config.get('AGORA_CHANNEL_PROFILE', 'live'),
     )
 
 @vclass_bp.route('/book-appointment', methods=['GET', 'POST'])
