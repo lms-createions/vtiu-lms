@@ -290,9 +290,32 @@ def handle_message(data):
     db.session.commit()
 
     if conv:
+        # Broadcast to Web
         for part in conv.participants:
             room = f"user_{part.user_public_id}"
             socketio.emit('new_message', {"conversation_id": conv.id, "message": msg.to_dict()}, room=room)
+        
+        # Bridge to Mobile (Ktor)
+        try:
+            from flask import current_app
+            redis_url = current_app.config.get('REDIS_URL')
+            if redis_url:
+                r = redis.from_url(redis_url)
+                # Map receiverId correctly
+                receiver_id = "global"
+                meta = conv.get_meta() or {}
+                if meta.get("meeting_id"):
+                    receiver_id = f"meeting_{meta['meeting_id']}"
+                
+                r.publish('vtiu_chat_broadcast', json.dumps({
+                    'sender_id': sender_pub,
+                    'sender_name': current_user.username if hasattr(current_user, 'username') else 'User',
+                    'receiver_id': receiver_id,
+                    'message': message_text,
+                    'timestamp': datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                }))
+        except Exception as e:
+            print(f"Bridge publish error: {e}")
 
 # ─────────────────────────
 # Routes
