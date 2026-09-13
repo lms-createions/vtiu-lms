@@ -1,12 +1,48 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from flask_socketio import emit, join_room
 from utils.extensions import db, socketio
 from models import Conversation, ConversationParticipant, Message, MessageReaction, User, Admin, StudentProfile, TeacherProfile
 from datetime import datetime
 import json
+import threading
+import redis
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/chat')
+
+# ───────────────
+# Redis Chat Bridge
+# ───────────────
+def start_redis_listener(app):
+    with app.app_context():
+        redis_url = app.config.get('REDIS_URL')
+        if not redis_url:
+            return
+        
+        r = redis.from_url(redis_url)
+        pubsub = r.pubsub()
+        pubsub.subscribe('vtiu_chat_broadcast')
+        
+        print("Redis: Flask listening on vtiu_chat_broadcast")
+        for message in pubsub.listen():
+            if message['type'] == 'message':
+                try:
+                    data = json.loads(message['data'])
+                    # Broadcast to Web clients via SocketIO
+                    socketio.emit('new_message', {
+                        'conversation_id': 0, 
+                        'message': {
+                            'sender_name': data.get('sender_name', 'Mobile User'),
+                            'content': data.get('message'),
+                            'created_at': data.get('timestamp')
+                        }
+                    }, namespace='/')
+                except Exception as e:
+                    print(f"Redis Bridge Error: {e}")
+
+def init_chat_bridge(app):
+    thread = threading.Thread(target=start_redis_listener, args=(app,), daemon=True)
+    thread.start()
 
 # -------------------------
 # Helper functions
