@@ -20,27 +20,6 @@ from utils.agora import build_rtc_token
 
 vclass_bp = Blueprint('vclass', __name__, url_prefix='/vclass')
 
-
-def manual_room_code(meeting_id):
-    """Return the fixed eight-character room code shared with students."""
-    value = int(meeting_id)
-    return f'VTIU{value:04X}'[-8:]
-
-
-def meeting_id_from_room_code(room_code):
-    """Decode a fixed eight-character VTIU room code."""
-    normalized = (room_code or '').strip().upper()
-    if len(normalized) != 8 or not normalized.startswith('VTIU'):
-        return None
-    digits = normalized[4:]
-    if any(character not in '0123456789ABCDEF' for character in digits):
-        return None
-    try:
-        value = int(digits, 16)
-    except ValueError:
-        return None
-    return value or None
-
 ALLOWED_EXTENSIONS = {'.doc', '.docx', '.xls', '.xlsx', '.pdf', '.ppt', '.txt'}
 UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads", "assignments")
 
@@ -1173,8 +1152,7 @@ def join_meeting_by_code():
     if not room_code:
         return render_template('vclass/join_by_code.html')
 
-    meeting_id = meeting_id_from_room_code(room_code)
-    meeting = Meeting.query.get(meeting_id) if meeting_id else None
+    meeting = Meeting.query.filter_by(meeting_code=room_code).first()
     if not meeting:
         flash('That room code is not valid. Ask the teacher to share it again.', 'danger')
         return render_template('vclass/join_by_code.html', room_code=room_code), 404
@@ -1204,8 +1182,7 @@ def api_join_meeting_by_code():
         return jsonify({'error': 'Only students can use this endpoint.'}), 403
 
     room_code = (request.args.get('room_code') or '').strip().upper()
-    meeting_id = meeting_id_from_room_code(room_code)
-    meeting = Meeting.query.get(meeting_id) if meeting_id else None
+    meeting = Meeting.query.filter_by(meeting_code=room_code).first() if room_code else None
     if not meeting:
         return jsonify({'error': 'Invalid room code.'}), 404
 
