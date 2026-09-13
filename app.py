@@ -20,6 +20,7 @@ load_dotenv()
 from flask_login import LoginManager, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
+from flask_sock import Sock
 from utils.extensions import db, mail, socketio
 from config import Config
 from utils.academic_year import configured_academic_year
@@ -27,6 +28,7 @@ from utils.academic_year import configured_academic_year
 # ===== Flask App =====
 app = Flask(__name__)
 app.config.from_object(Config)
+sock = Sock(app)
 
 
 @app.context_processor
@@ -925,11 +927,12 @@ from student_routes import student_bp
 from teacher_routes import teacher_bp
 from exam_routes import exam_bp
 from vclass_routes import vclass_bp
-from chat_routes import chat_bp
+from chat_routes import chat_bp, init_chat_bridge
 from finance_routes import finance_bp
 from student_results_routes import results_bp
 from student_transcript_routes import create_student_transcript_blueprint
 from admissions.routes import admissions_bp
+from mobile_api_routes import mobile_api_bp, init_mobile_ws
 
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(student_bp, url_prefix='/student')
@@ -941,6 +944,13 @@ app.register_blueprint(finance_bp, url_prefix='/finance')
 app.register_blueprint(results_bp, url_prefix='/student-results')
 app.register_blueprint(create_student_transcript_blueprint())
 app.register_blueprint(admissions_bp, url_prefix='/admissions')
+app.register_blueprint(mobile_api_bp)
+
+# Initialize Mobile WebSockets
+init_mobile_ws(sock)
+
+# Initialize Chat Bridge
+init_chat_bridge(app)
 
 logger.info("✅ All blueprints registered successfully")
 
